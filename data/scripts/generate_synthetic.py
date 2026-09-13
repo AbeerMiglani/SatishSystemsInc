@@ -13,6 +13,7 @@ Hospitals -> Telecom Towers
 Road Junctions connect to each other and nearby facilities
 """
 
+import hashlib
 import json
 import math
 import os
@@ -37,6 +38,62 @@ COUNTS = {
 
 # Ensure reproducible generation
 random.seed(2026)
+
+
+def deterministic_uuid4(identity: str) -> str:
+    """Derive a stable RFC 4122 version-4 UUID from an identity string.
+
+    ``uuid.uuid4()`` draws from ``os.urandom`` and ignores ``random.seed``, so
+    every regeneration used to rename every asset in the network even though the
+    rest of the payload was already reproducible. Hashing a stable identity
+    instead makes the IDs a pure function of the topology.
+
+    Version 4 specifically, not ``uuid5``: the recommendation API types its node
+    fields as pydantic ``UUID4`` and coerces anything else into a surrogate (see
+    ``_to_deterministic_uuid4`` in ``backend/app/services/recommendations.py``),
+    so a v5 ID would come back from the API as a different value than the node it
+    names. This is that same helper's algorithm, kept byte-for-byte compatible.
+    """
+    digest = bytearray(hashlib.blake2b(identity.encode("utf-8"), digest_size=16).digest())
+    digest[6] = (digest[6] & 0x0F) | 0x40  # Version 4
+    digest[8] = (digest[8] & 0x3F) | 0x80  # Variant RFC 4122
+    return str(uuid.UUID(bytes=bytes(digest)))
+
+
+def node_identity(name: str) -> str:
+    """Identity key for a node.
+
+    ``name`` is derived from ``(node_type, index)`` and is unique across the
+    dataset, so it is stable in a way coordinates are not: a one-ulp change in a
+    float repr would otherwise renumber the whole network.
+    """
+    return f"ripple:node:{name}"
+
+
+def edge_identity(edge_type: str, source_id: str, target_id: str) -> str:
+    """Identity key for an edge.
+
+    Mirrors the database's own uniqueness key for an edge --
+    ``UniqueConstraint("network_id", "source_id", "target_id", "edge_type")`` in
+    ``backend/app/models/network.py`` -- so an identity collision here is exactly
+    a constraint violation there.
+    """
+    return f"ripple:edge:{edge_type}:{source_id}:{target_id}"
+
+
+def new_edge(source_id, target_id, edge_type, weight, capacity, is_bidirectional):
+    """Build an edge dict with a deterministic ID derived from its endpoints."""
+    return {
+        "id": deterministic_uuid4(edge_identity(edge_type, source_id, target_id)),
+        "source_id": source_id,
+        "target_id": target_id,
+        "edge_type": edge_type,
+        "weight": weight,
+        "capacity": capacity,
+        "is_bidirectional": is_bidirectional,
+        "is_synthetic": True,
+        "data_source": "synthetic",
+    }
 
 
 def random_point_near(center, radius_deg):
@@ -86,7 +143,7 @@ def generate_nodes():
                 name = f"Road Junction RJ-{i+1:02d}"
                 
             nodes.append({
-                "id": str(uuid.uuid4()),
+                "id": deterministic_uuid4(node_identity(name)),
                 "name": name,
                 "node_type": ntype,
                 "lat": lat,
@@ -119,78 +176,28 @@ def generate_edges(nodes):
     for ws in by_type["water_station"]:
         closest_ps = get_closest(ws, by_type["power_substation"], 2)
         for ps in closest_ps:
-            edges.append({
-                "id": str(uuid.uuid4()),
-                "source_id": ps["id"],
-                "target_id": ws["id"],
-                "edge_type": "power_supply",
-                "weight": 1.0,
-                "capacity": 50.0,
-                "is_bidirectional": False,
-                "is_synthetic": True,
-                "data_source": "synthetic"
-            })
+            edges.append(new_edge(ps["id"], ws["id"], "power_supply", 1.0, 50.0, False))
 
     # 2. Power -> Hospital (each hospital gets power from 2 closest substations)
     for hp in by_type["hospital"]:
         closest_ps = get_closest(hp, by_type["power_substation"], 2)
         for ps in closest_ps:
-            edges.append({
-                "id": str(uuid.uuid4()),
-                "source_id": ps["id"],
-                "target_id": hp["id"],
-                "edge_type": "power_supply",
-                "weight": 1.0,
-                "capacity": 30.0,
-                "is_bidirectional": False,
-                "is_synthetic": True,
-                "data_source": "synthetic"
-            })
+            edges.append(new_edge(ps["id"], hp["id"], "power_supply", 1.0, 30.0, False))
 
     # 3. Water -> Hospital (each hospital gets water from 1 closest water station)
     for hp in by_type["hospital"]:
         closest_ws = get_closest(hp, by_type["water_station"], 1)[0]
-        edges.append({
-            "id": str(uuid.uuid4()),
-            "source_id": closest_ws["id"],
-            "target_id": hp["id"],
-            "edge_type": "water_supply",
-            "weight": 1.0,
-            "capacity": 40.0,
-            "is_bidirectional": False,
-            "is_synthetic": True,
-            "data_source": "synthetic"
-        })
+        edges.append(new_edge(closest_ws["id"], hp["id"], "water_supply", 1.0, 40.0, False))
         
     # 4. Power -> Telecom
     for tc in by_type["telecom_tower"]:
         closest_ps = get_closest(tc, by_type["power_substation"], 1)[0]
-        edges.append({
-            "id": str(uuid.uuid4()),
-            "source_id": closest_ps["id"],
-            "target_id": tc["id"],
-            "edge_type": "power_supply",
-            "weight": 1.0,
-            "capacity": 20.0,
-            "is_bidirectional": False,
-            "is_synthetic": True,
-            "data_source": "synthetic"
-        })
+        edges.append(new_edge(closest_ps["id"], tc["id"], "power_supply", 1.0, 20.0, False))
         
     # 5. Hospital -> Telecom (Dependency)
     for hp in by_type["hospital"]:
         closest_tc = get_closest(hp, by_type["telecom_tower"], 1)[0]
-        edges.append({
-            "id": str(uuid.uuid4()),
-            "source_id": hp["id"],
-            "target_id": closest_tc["id"],
-            "edge_type": "depends_on",
-            "weight": 1.0,
-            "capacity": 10.0,
-            "is_bidirectional": False,
-            "is_synthetic": True,
-            "data_source": "synthetic"
-        })
+        edges.append(new_edge(hp["id"], closest_tc["id"], "depends_on", 1.0, 10.0, False))
 
     # 6. Road network
     # To guarantee connectivity, first build a Minimum Spanning Tree of all road junctions
@@ -207,17 +214,7 @@ def generate_edges(nodes):
     # Add MST edges to our output
     added_edges = set()
     for u, v in mst.edges():
-        edges.append({
-            "id": str(uuid.uuid4()),
-            "source_id": u,
-            "target_id": v,
-            "edge_type": "road_link",
-            "weight": mst[u][v]["weight"],
-            "capacity": 100.0,
-            "is_bidirectional": True,
-            "is_synthetic": True,
-            "data_source": "synthetic"
-        })
+        edges.append(new_edge(u, v, "road_link", mst[u][v]["weight"], 100.0, True))
         added_edges.add(tuple(sorted([u, v])))
         
     # Add a few more local connections so it's not just a bare tree, but strictly distance-constrained
@@ -230,35 +227,58 @@ def generate_edges(nodes):
             if dist < MAX_ROAD_DIST:
                 edge_tuple = tuple(sorted([rj["id"], neighbor["id"]]))
                 if edge_tuple not in added_edges:
-                    edges.append({
-                        "id": str(uuid.uuid4()),
-                        "source_id": rj["id"],
-                        "target_id": neighbor["id"],
-                        "edge_type": "road_link",
-                        "weight": dist,
-                        "capacity": 100.0,
-                        "is_bidirectional": True,
-                        "is_synthetic": True,
-                        "data_source": "synthetic"
-                    })
+                    edges.append(
+                        new_edge(rj["id"], neighbor["id"], "road_link", dist, 100.0, True)
+                    )
                     added_edges.add(edge_tuple)
     # Connect non-road facilities to nearest road junction
     for n in nodes:
         if n["node_type"] != "road_junction":
             closest_rj = get_closest(n, by_type["road_junction"], 1)[0]
-            edges.append({
-                "id": str(uuid.uuid4()),
-                "source_id": n["id"],
-                "target_id": closest_rj["id"],
-                "edge_type": "road_link",
-                "weight": distance((n["lat"], n["lng"]), (closest_rj["lat"], closest_rj["lng"])),
-                "capacity": 60.0,
-                "is_bidirectional": True,
-                "is_synthetic": True,
-                "data_source": "synthetic"
-            })
+            edges.append(
+                new_edge(
+                    n["id"],
+                    closest_rj["id"],
+                    "road_link",
+                    distance((n["lat"], n["lng"]), (closest_rj["lat"], closest_rj["lng"])),
+                    60.0,
+                    True,
+                )
+            )
 
     return edges
+
+
+def assert_identities_unique(nodes, edges):
+    """Assert that every deterministic identity key resolves to exactly one row.
+
+    IDs are derived from these keys, so a duplicate key means two rows sharing a
+    primary key -- and for edges, exactly the ``uq_network_edge`` constraint
+    violation the database would raise on ingestion. Fail here, loudly, rather
+    than emitting a fixture that cannot be loaded.
+    """
+    names = [n["name"] for n in nodes]
+    if len(set(names)) != len(names):
+        dupes = sorted({name for name in names if names.count(name) > 1})
+        raise AssertionError(f"Node names are not unique, so node IDs would collide: {dupes}")
+
+    triples = [(e["edge_type"], e["source_id"], e["target_id"]) for e in edges]
+    if len(set(triples)) != len(triples):
+        dupes = sorted({t for t in triples if triples.count(t) > 1})
+        raise AssertionError(f"Edge (edge_type, source, target) keys are not unique: {dupes}")
+
+    node_ids = {n["id"] for n in nodes}
+    if len(node_ids) != len(nodes):
+        raise AssertionError("Derived node IDs collided despite unique names.")
+
+    dangling = [
+        e["id"] for e in edges
+        if e["source_id"] not in node_ids or e["target_id"] not in node_ids
+    ]
+    if dangling:
+        raise AssertionError(f"{len(dangling)} edge(s) reference unknown nodes: {dangling[:5]}")
+
+    print("✅ Deterministic identity assertions passed.")
 
 
 def assert_connectivity(nodes, edges):
@@ -310,6 +330,7 @@ def main():
     print(f"Generated {len(nodes)} nodes and {len(edges)} edges.")
     
     # Run assertions
+    assert_identities_unique(nodes, edges)
     assert_connectivity(nodes, edges)
     
     # Format as GeoJSON

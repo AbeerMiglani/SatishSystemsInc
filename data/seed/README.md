@@ -49,8 +49,18 @@ python data/scripts/generate_synthetic.py
 ```
 
 The generator uses a fixed seed for scenario structure and validates graph
-connectivity and hospital reachability before writing the files. UUIDs are
-generated per run, so regenerated IDs can differ from the checked-in fixtures.
+connectivity and hospital reachability before writing the files.
+
+IDs are deterministic. Each node ID is derived from the node's `name` and each
+edge ID from its `(edge_type, source_id, target_id)` triple — the same key the
+database enforces as unique — so regeneration reproduces exactly the IDs in the
+checked-in fixtures rather than minting new ones. They are RFC 4122 version-4
+UUIDs, which the recommendation API requires, produced by hashing the identity
+key rather than by drawing randomness.
+
+Note that the checked-in fixtures carry hand-tuned water-station and telecom
+loads that the generator does not currently reproduce, so regenerating replaces
+those values and changes how the demo network cascades.
 
 ## Optional OSM road data
 
