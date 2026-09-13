@@ -1,68 +1,114 @@
+/**
+ * CascadeTimeline — compact horizontal control bar for the cascade animation.
+ * Sits below the map, lets users scrub through waves, play/pause, rewind.
+ */
+
 import React from "react";
-import type { CascadeWave } from "../types";
+import { useSimulationStore } from "../stores/simulationStore";
 
-interface CascadeTimelineProps {
-  waves: CascadeWave[];
-  currentWave: number;
-  isPlaying: boolean;
-  onPlayPause: () => void;
-  onReset: () => void;
-  onWaveChange: (index: number) => void;
-}
+export default function CascadeTimeline() {
+  const result = useSimulationStore((s) => s.result);
+  const currentWave = useSimulationStore((s) => s.currentWave);
+  const isPlaying = useSimulationStore((s) => s.isPlaying);
+  const play = useSimulationStore((s) => s.play);
+  const pause = useSimulationStore((s) => s.pause);
+  const setWave = useSimulationStore((s) => s.setWave);
+  const rewindToStart = useSimulationStore((s) => s.rewindToStart);
 
-export default function CascadeTimeline({
-  waves,
-  currentWave,
-  isPlaying,
-  onPlayPause,
-  onReset,
-  onWaveChange,
-}: CascadeTimelineProps) {
-  if (waves.length === 0) return null;
+  if (!result || result.status !== "completed") return null;
 
-  const selectedWave = waves[Math.max(0, Math.min(currentWave, waves.length - 1))];
-  const minuteLabel =
-    selectedWave.simulated_minute === undefined
-      ? ""
-      : ` — ${selectedWave.simulated_minute} min`;
-  const populationLabel =
-    selectedWave.population_affected_estimate === undefined
-      ? ""
-      : ` — ${selectedWave.population_affected_estimate.toLocaleString()} affected`;
+  const waves = result.waves;
+  const waveCount = waves.length;
+
+  const handlePlayPause = () => {
+    if (isPlaying) {
+      pause();
+    } else {
+      play();
+    }
+  };
+
+  const handleStepBack = () => {
+    if (currentWave <= 0) {
+      rewindToStart();
+    } else {
+      setWave(currentWave - 1);
+    }
+  };
+
+  const handleStepForward = () => {
+    const next = currentWave + 1;
+    if (next < waveCount) {
+      setWave(next);
+    }
+  };
+
+  const scrubberValue = currentWave >= 0 ? currentWave : 0;
+
+  const waveLabel =
+    currentWave === -1
+      ? "Pre-cascade"
+      : `Wave ${currentWave + 1} / ${waveCount}`;
+
+  const btnStyle: React.CSSProperties = {
+    background: "#334155",
+    border: "none",
+    color: "#e2e8f0",
+    borderRadius: 4,
+    padding: "4px 10px",
+    fontSize: 13,
+    cursor: "pointer",
+    lineHeight: 1,
+  };
 
   return (
-    <div style={{ marginTop: 12, padding: 12, background: "#0f172a", borderRadius: 4 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-        <span style={{ fontSize: 14 }}>
-          Wave {selectedWave.wave} / {waves.length - 1}
-          {minuteLabel}
-          {populationLabel}
-        </span>
-        <div style={{ display: "flex", gap: 6 }}>
-          <button onClick={onPlayPause} style={buttonStyle}>
-            {isPlaying ? "Pause" : "Play"}
-          </button>
-          <button onClick={onReset} style={buttonStyle}>Reset</button>
-        </div>
-      </div>
+    <div
+      style={{
+        flexShrink: 0,
+        height: 48,
+        background: "#1e293b",
+        borderTop: "1px solid #334155",
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "0 12px",
+        userSelect: "none",
+      }}
+    >
+      {/* Rewind */}
+      <button style={btnStyle} onClick={() => rewindToStart()} title="Rewind to start">
+        ⏮
+      </button>
+
+      {/* Step Back */}
+      <button style={btnStyle} onClick={handleStepBack} title="Step back">
+        ◀
+      </button>
+
+      {/* Play / Pause */}
+      <button style={{ ...btnStyle, background: "#2563eb" }} onClick={handlePlayPause} title={isPlaying ? "Pause" : "Play"}>
+        {isPlaying ? "⏸" : "▶"}
+      </button>
+
+      {/* Step Forward */}
+      <button style={btnStyle} onClick={handleStepForward} title="Step forward">
+        ▶|
+      </button>
+
+      {/* Scrubber */}
       <input
-        aria-label="Cascade timeline"
         type="range"
         min={0}
-        max={waves.length - 1}
-        value={Math.max(0, currentWave)}
-        onChange={(event) => onWaveChange(Number(event.target.value))}
-        style={{ width: "100%", marginTop: 10 }}
+        max={waveCount > 0 ? waveCount - 1 : 0}
+        value={scrubberValue}
+        onChange={(e) => setWave(Number(e.target.value))}
+        style={{ flex: 1, accentColor: "#3b82f6", cursor: "pointer" }}
       />
+
+      {/* Wave label */}
+      <span style={{ fontSize: 12, color: "#94a3b8", whiteSpace: "nowrap", minWidth: 110, textAlign: "right" }}>
+        {waveLabel}
+      </span>
     </div>
   );
 }
-
-const buttonStyle: React.CSSProperties = {
-  padding: "5px 9px",
-  background: "#334155",
-  color: "white",
-  border: "none",
-  borderRadius: 4,
-  cursor: "pointer",
-};

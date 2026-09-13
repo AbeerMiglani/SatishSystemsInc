@@ -14,6 +14,8 @@ export type NodeType =
 
 export type NodeStatus = "operational" | "degraded" | "failed";
 
+export type DataSource = "osm" | "synthetic" | "hybrid" | string;
+
 export interface InfraNode {
   id: string;
   name: string;
@@ -26,6 +28,10 @@ export interface InfraNode {
   failure_threshold: number;
   population_served: number;
   status: NodeStatus;
+  is_synthetic?: boolean;
+  data_source?: DataSource;
+  name_source?: string;
+  data_quality?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -58,12 +64,7 @@ export interface Network {
 // ---------------------------------------------------------------------------
 export interface CascadeWave {
   wave: number;
-  simulated_minute?: number;
   failed_node_ids: string[];
-  cumulative_failed_count?: number;
-  population_affected_estimate?: number;
-  hospital_count_operational?: number;
-  hospital_count_failed?: number;
 }
 
 export interface SimulationResult {
@@ -73,30 +74,49 @@ export interface SimulationResult {
   waves: CascadeWave[];
   total_failed: number;
   population_affected_estimate: number;
-  population_total?: number;
-  population_affected_percentage?: number;
-  population_overlap_unresolved?: boolean;
-  population_estimate_is_capped?: boolean;
-  population_impact_method?: string;
+  study_area_population_cap?: number;
+  is_population_capped?: boolean;
+  has_unresolved_overlap?: boolean;
   global_efficiency_before: number;
   global_efficiency_after: number;
   status: "pending" | "running" | "completed" | "failed";
 }
 
-export interface Recommendation {
-  candidate_id: string;
-  candidate_display_name: string;
-  scenario_payload: Modification;
+export type InterventionType = "upgrade_node" | "add_edge" | string;
+
+export interface MitigationRecommendation {
+  rank: number;
+  node_id: string;
+  node_name: string;
+  display_name?: string;
+  intervention_type: InterventionType;
+  proposed_capacity?: number;
+  target_node_id?: string;
+  target_node_name?: string;
+  target_display_name?: string;
   failures_prevented: number;
-  population_saved: number;
+  raw_population_saved: number;
   efficiency_gain: number;
-  verified: boolean;
+  protects_critical_services?: boolean;
+  verified?: boolean;
+  scenario_payload: {
+    network_id: string;
+    name: string;
+    description: string;
+    modifications: any[];
+    initial_failures: string[];
+  };
 }
 
 export interface CentralityScore {
   node_id: string;
+  name: string;
   display_name?: string;
-  metric?: "betweenness" | "pagerank";
+  node_type: string;
+  is_synthetic?: boolean;
+  data_source?: DataSource;
+  name_source?: string;
+  data_quality?: string;
   score: number;
   rank: number;
 }
@@ -104,21 +124,27 @@ export interface CentralityScore {
 // ---------------------------------------------------------------------------
 // Scenario
 // ---------------------------------------------------------------------------
-export interface Modification {
-  type: "add_edge" | "upgrade_node";
-  source?: string;
-  target?: string;
-  node_id?: string;
-  edge_type?: EdgeType;
+export interface AddEdgeModification {
+  type: "add_edge";
+  source: string;
+  target: string;
+  edge_type: EdgeType;
   weight?: number;
+  capacity?: number;
+  is_bidirectional?: boolean;
+}
+
+export interface UpgradeNodeModification {
+  type: "upgrade_node";
+  node_id: string;
   capacity?: number;
   capacity_multiplier?: number;
   capacity_add?: number;
   failure_threshold?: number;
-  failure_threshold_multiplier?: number;
   failure_threshold_add?: number;
-  is_bidirectional?: boolean;
 }
+
+export type Modification = AddEdgeModification | UpgradeNodeModification;
 
 export interface Scenario {
   id: string;

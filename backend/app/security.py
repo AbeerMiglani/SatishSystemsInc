@@ -1,6 +1,5 @@
 """Small, explicit authentication and abuse-control boundary for the API."""
 
-import hashlib
 import logging
 import secrets
 from dataclasses import dataclass

@@ -1,18 +1,19 @@
+from __future__ import annotations
+
 import logging
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import UUID4, BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.db.postgres import get_db
-from app.models.network import Edge, Network, Node, Scenario, SimulationResult
+from app.models.network import Network, Node, Scenario, SimulationResult
 from app.security import enforce_rate_limit, require_operator, require_viewer
-from app.schemas.simulation import WaveSchema
+from app.services.recommendations import MitigationRecommendation, get_recommendations
 from app.simulation.runner import run_simulation_task
-from app.services.recommendations import recommend_interventions
 
 router = APIRouter(
     prefix="/simulations",
@@ -35,6 +36,11 @@ class SimulationCreate(BaseModel):
         return values
 
 
+class WaveSchema(BaseModel):
+    wave: int
+    failed_node_ids: list[UUID4]
+
+
 class SimulationResponse(BaseModel):
     id: UUID4
     network_id: UUID4
@@ -43,11 +49,6 @@ class SimulationResponse(BaseModel):
     waves: list[WaveSchema]
     total_failed: int
     population_affected_estimate: int
-    population_total: int = 65_000
-    population_affected_percentage: float = 0.0
-    population_overlap_unresolved: bool = True
-    population_estimate_is_capped: bool = False
-    population_impact_method: str = "legacy_node_exposure"
     global_efficiency_before: float | None = None
     global_efficiency_after: float | None = None
     error_message: str | None = None
@@ -113,29 +114,6 @@ def create_simulation(
     return sim
 
 
-@router.get("/{sim_id}/recommendations")
-def get_recommendations(sim_id: uuid.UUID, db: Session = Depends(get_db)):
-    sim = db.query(SimulationResult).filter(SimulationResult.id == sim_id).first()
-    if not sim:
-        raise HTTPException(status_code=404, detail="Simulation not found")
-    if sim.status != "completed":
-        raise HTTPException(status_code=400, detail="Recommendations require a completed simulation")
-    nodes = db.query(Node).filter(Node.network_id == sim.network_id).all()
-    edges = db.query(Edge).filter(Edge.network_id == sim.network_id).all()
-    scenario = (
-        db.query(Scenario)
-        .filter(Scenario.cached_result_id == sim.id, Scenario.network_id == sim.network_id)
-        .first()
-    )
-    recommendations = recommend_interventions(
-        sim,
-        nodes,
-        edges,
-        scenario_modifications=scenario.modifications if scenario else None,
-    )
-    return {"simulation_id": sim.id, "recommendations": recommendations}
-
-
 @router.get("/{sim_id}", response_model=SimulationResponse)
 def get_simulation(sim_id: uuid.UUID, db: Session = Depends(get_db)):
     """Fetch the status and results of a simulation."""
@@ -143,3 +121,33 @@ def get_simulation(sim_id: uuid.UUID, db: Session = Depends(get_db)):
     if not sim:
         raise HTTPException(status_code=404, detail="Simulation not found")
     return sim
+
+
+@router.get(
+    "/{sim_id}/recommendations",
+    response_model=list[MitigationRecommendation],
+    summary="Get Deterministic Mitigation Recommendations",
+    description=(
+        "Returns a deterministically ranked list of mitigation interventions for a completed simulation. "
+        "Each candidate is re-simulated in memory against the Motter-Lai cascade model to verify genuine failure "
+        "reduction, population protection, and efficiency gain. Every recommendation includes a ready-to-post "
+        "scenario_payload for 1-click execution in the UI."
+    ),
+)
+def get_simulation_recommendations(
+    sim_id: uuid.UUID,
+    limit: int = Query(default=10, ge=1, le=50, description="Max recommendations to return"),
+    db: Session = Depends(get_db),
+):
+    """Fetch mitigation recommendations for a completed simulation."""
+    sim = db.query(SimulationResult).filter(SimulationResult.id == sim_id).first()
+    if not sim:
+        raise HTTPException(status_code=404, detail="Simulation not found")
+
+    if sim.status != "completed":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Simulation status is '{sim.status}'. Recommendations are only available for completed simulations.",
+        )
+
+    return get_recommendations(simulation=sim, db=db, limit=limit)

@@ -4,7 +4,7 @@ Uses GeoAlchemy2 for PostGIS geometries.
 """
 
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from geoalchemy2 import Geometry
 from sqlalchemy import (
@@ -21,9 +21,11 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, validates
 
 from app.db.postgres import Base
+
+UTC = getattr(datetime, "UTC", timezone.utc)  # noqa: UP017
 
 
 class Network(Base):
@@ -56,9 +58,6 @@ class Node(Base):
         PG_UUID(as_uuid=True), ForeignKey("networks.id", ondelete="CASCADE"), nullable=False, index=True
     )
     name = Column(String, nullable=False)
-    display_name_value = Column(String, nullable=True)
-    name_source = Column(String, nullable=False, default="synthetic")
-    data_quality = Column(String, nullable=False, default="estimated")
     node_type = Column(
         Enum(
             "power_substation",
@@ -79,22 +78,33 @@ class Node(Base):
     current_load = Column(Float, nullable=False, default=0.0)
     failure_threshold = Column(Float, nullable=False, default=1.0)
     population_served = Column(Integer, nullable=False, default=0)
-    population_zone_id = Column(String, nullable=True)
     status = Column(
         Enum("operational", "degraded", "failed", name="node_status_enum"),
         default="operational",
         nullable=False,
     )
+    is_synthetic = Column(Boolean, nullable=False, default=True, server_default="true")
+    data_source = Column(String, nullable=False, default="synthetic", server_default="synthetic")
+    display_name = Column(String, nullable=False)
+    name_source = Column(String, nullable=False, default="synthetic", server_default="synthetic")
+    data_quality = Column(String, nullable=False, default="verified", server_default="verified")
+
+    @validates("name")
+    def sync_display_name_from_name(self, key, value):
+        if not getattr(self, "display_name", None):
+            self.display_name = value
+        return value
+
+    @validates("display_name")
+    def validate_display_name(self, key, value):
+        if not value and getattr(self, "name", None):
+            return self.name
+        return value
 
     network = relationship("Network", back_populates="nodes")
     # Relationships for edges where this node is source/target
     edges_out = relationship("Edge", foreign_keys="Edge.source_id", back_populates="source")
     edges_in = relationship("Edge", foreign_keys="Edge.target_id", back_populates="target")
-
-    @property
-    def display_name(self) -> str:
-        """Stable human-readable label; UUID remains the canonical identifier."""
-        return self.display_name_value or self.name
 
 
 class Edge(Base):
@@ -168,11 +178,9 @@ class SimulationResult(Base):
     
     total_failed = Column(Integer, nullable=False, default=0)
     population_affected_estimate = Column(Integer, nullable=False, default=0)
-    population_total = Column(Integer, nullable=False, default=65000)
-    population_affected_percentage = Column(Float, nullable=False, default=0.0)
-    population_overlap_unresolved = Column(Boolean, nullable=False, default=True)
-    population_estimate_is_capped = Column(Boolean, nullable=False, default=False)
-    population_impact_method = Column(String, nullable=False, default="legacy_node_exposure")
+    study_area_population_cap = Column(Integer, nullable=False, default=65000, server_default="65000")
+    is_population_capped = Column(Boolean, nullable=False, default=False, server_default="false")
+    has_unresolved_overlap = Column(Boolean, nullable=False, default=False, server_default="false")
     global_efficiency_before = Column(Float, nullable=True)
     global_efficiency_after = Column(Float, nullable=True)
     

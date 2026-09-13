@@ -10,7 +10,7 @@ import maplibregl from "maplibre-gl";
 import { Deck } from "@deck.gl/core";
 import { ScatterplotLayer, LineLayer } from "@deck.gl/layers";
 import type { InfraNode, InfraEdge } from "../types";
-import { NODE_COLORS, FAILED_COLOR, SELECTED_COLOR } from "../types";
+import { NODE_COLORS, NODE_LABELS, FAILED_COLOR, SELECTED_COLOR } from "../types";
 import { useUIStore } from "../stores/uiStore";
 import { useSimulationStore } from "../stores/simulationStore";
 
@@ -214,6 +214,38 @@ export default function MapView({ nodes, edges }: MapViewProps) {
       layers: [],
       style: { position: "absolute", top: "0", left: "0", zIndex: 1, pointerEvents: "auto" } as any,
       getCursor: ({ isHovering }) => (isHovering ? "pointer" : "grab"),
+      getTooltip: ({ object }: { object?: InfraNode }) => {
+        if (!object) return null;
+        const typeLabel = NODE_LABELS[object.node_type] || object.node_type;
+        const color = NODE_COLORS[object.node_type] || [148, 163, 184];
+        const statusColor = object.status === "failed" ? "#ef4444" : "#22c55e";
+        return {
+          html: `
+            <div style="font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; font-size: 12px; color: #f8fafc; min-width: 160px; line-height: 1.4;">
+              <div style="font-weight: 700; font-size: 13px; color: #ffffff; margin-bottom: 3px;">${object.display_name || object.name || "Unnamed Asset"}</div>
+              <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+                <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: rgb(${color.join(',')});"></span>
+                <span style="color: #94a3b8; font-size: 11px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;">${typeLabel}</span>
+                <span style="color: ${statusColor}; font-size: 10px; margin-left: auto; text-transform: capitalize;">${object.status}</span>
+              </div>
+              <div style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; color: #64748b; border-top: 1px solid #334155; padding-top: 4px; margin-top: 4px;">
+                ID: ${object.id}
+              </div>
+              ${object.population_served ? `<div style="font-size: 11px; color: #cbd5e1; margin-top: 2px;">Pop Served: ${object.population_served.toLocaleString()}</div>` : ""}
+              <div style="font-size: 10px; color: #a7f3d0; margin-top: 2px;">Source: ${object.name_source || object.data_source || "synthetic"} | Quality: ${object.data_quality || "verified"}</div>
+            </div>
+          `,
+          style: {
+            backgroundColor: "#0f172a",
+            border: "1px solid #334155",
+            borderRadius: "6px",
+            padding: "8px 12px",
+            boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.5)",
+            pointerEvents: "none",
+            zIndex: "1000",
+          },
+        };
+      },
     });
 
     // Sync deck.gl viewState with MapLibre camera

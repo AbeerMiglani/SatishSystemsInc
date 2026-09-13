@@ -10,6 +10,7 @@ from app.security import websocket_principal
 
 router = APIRouter(tags=["WebSockets"])
 
+
 @router.websocket("/ws/simulations/{sim_id}")
 async def simulation_websocket(websocket: WebSocket, sim_id: str):
     try:

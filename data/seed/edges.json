@@ -6,7 +6,9 @@
     "edge_type": "power_supply",
     "weight": 1.0,
     "capacity": 50.0,
-    "is_bidirectional": false
+    "is_bidirectional": false,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "0749ceb0-74d4-4cf3-9d09-ae202c900122",
@@ -15,7 +17,9 @@
     "edge_type": "power_supply",
     "weight": 1.0,
     "capacity": 50.0,
-    "is_bidirectional": false
+    "is_bidirectional": false,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "2d5c78f1-a65c-407f-abcb-1b77b87e10e3",
@@ -24,7 +28,9 @@
     "edge_type": "power_supply",
     "weight": 1.0,
     "capacity": 50.0,
-    "is_bidirectional": false
+    "is_bidirectional": false,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "fe156da8-df36-47dc-bc22-19f26eaa0dae",
@@ -33,7 +39,9 @@
     "edge_type": "power_supply",
     "weight": 1.0,
     "capacity": 50.0,
-    "is_bidirectional": false
+    "is_bidirectional": false,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "1210da27-1ae2-4af4-9b70-14623d1311b3",
@@ -42,7 +50,9 @@
     "edge_type": "power_supply",
     "weight": 1.0,
     "capacity": 50.0,
-    "is_bidirectional": false
+    "is_bidirectional": false,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "9b8086e7-fb18-4842-a6eb-8d9bd622e1ad",
@@ -51,7 +61,9 @@
     "edge_type": "power_supply",
     "weight": 1.0,
     "capacity": 50.0,
-    "is_bidirectional": false
+    "is_bidirectional": false,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "d6d501ed-22f1-449f-92cb-405be590730c",
@@ -60,7 +72,9 @@
     "edge_type": "power_supply",
     "weight": 1.0,
     "capacity": 50.0,
-    "is_bidirectional": false
+    "is_bidirectional": false,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "2e7904e4-8982-4065-8a35-5d53ba09d9dc",
@@ -69,7 +83,9 @@
     "edge_type": "power_supply",
     "weight": 1.0,
     "capacity": 50.0,
-    "is_bidirectional": false
+    "is_bidirectional": false,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "c8a11366-854a-43de-b28c-dd548487c918",
@@ -78,7 +94,9 @@
     "edge_type": "power_supply",
     "weight": 1.0,
     "capacity": 50.0,
-    "is_bidirectional": false
+    "is_bidirectional": false,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "aaa866f1-bfcb-490d-b94c-87949e823585",
@@ -87,7 +105,9 @@
     "edge_type": "power_supply",
     "weight": 1.0,
     "capacity": 50.0,
-    "is_bidirectional": false
+    "is_bidirectional": false,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "ca0e3a49-eaf6-4b3a-a1da-dd3038e44dd4",
@@ -96,7 +116,9 @@
     "edge_type": "power_supply",
     "weight": 1.0,
     "capacity": 50.0,
-    "is_bidirectional": false
+    "is_bidirectional": false,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "06d85b10-c97a-4682-a425-25d743320e5b",
@@ -105,7 +127,9 @@
     "edge_type": "power_supply",
     "weight": 1.0,
     "capacity": 50.0,
-    "is_bidirectional": false
+    "is_bidirectional": false,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "62ae4d33-9e48-431f-87a0-a8d74f2c7546",
@@ -114,7 +138,9 @@
     "edge_type": "power_supply",
     "weight": 1.0,
     "capacity": 30.0,
-    "is_bidirectional": false
+    "is_bidirectional": false,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "a937dfcb-cf32-4eb4-98e8-deb89716aa65",
@@ -123,7 +149,9 @@
     "edge_type": "power_supply",
     "weight": 1.0,
     "capacity": 30.0,
-    "is_bidirectional": false
+    "is_bidirectional": false,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "029affae-7c65-4281-9f47-c5a1c0dbcfa1",
@@ -132,7 +160,9 @@
     "edge_type": "power_supply",
     "weight": 1.0,
     "capacity": 30.0,
-    "is_bidirectional": false
+    "is_bidirectional": false,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "124d115b-a793-447a-b50c-2a7b713bee66",
@@ -141,7 +171,9 @@
     "edge_type": "power_supply",
     "weight": 1.0,
     "capacity": 30.0,
-    "is_bidirectional": false
+    "is_bidirectional": false,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "e3d88fd8-0c27-4082-bc8d-064d14bca99a",
@@ -150,7 +182,9 @@
     "edge_type": "power_supply",
     "weight": 1.0,
     "capacity": 30.0,
-    "is_bidirectional": false
+    "is_bidirectional": false,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "b4dcc18b-23af-46ef-a32d-1ed8bce1ac82",
@@ -159,7 +193,9 @@
     "edge_type": "power_supply",
     "weight": 1.0,
     "capacity": 30.0,
-    "is_bidirectional": false
+    "is_bidirectional": false,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "3a934e3b-231b-4f98-b042-83b6319a6262",
@@ -168,7 +204,9 @@
     "edge_type": "power_supply",
     "weight": 1.0,
     "capacity": 30.0,
-    "is_bidirectional": false
+    "is_bidirectional": false,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "8fd268d7-f2f0-489c-9fbb-f9290ebbb561",
@@ -177,7 +215,9 @@
     "edge_type": "power_supply",
     "weight": 1.0,
     "capacity": 30.0,
-    "is_bidirectional": false
+    "is_bidirectional": false,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "6da90a81-58cc-48ba-8bd0-4293f15c7292",
@@ -186,7 +226,9 @@
     "edge_type": "water_supply",
     "weight": 1.0,
     "capacity": 40.0,
-    "is_bidirectional": false
+    "is_bidirectional": false,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "7056111f-9bec-468f-94f1-1caf60dc4f81",
@@ -195,7 +237,9 @@
     "edge_type": "water_supply",
     "weight": 1.0,
     "capacity": 40.0,
-    "is_bidirectional": false
+    "is_bidirectional": false,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "f62d89c1-202b-4805-b9cf-e4cbe76584ef",
@@ -204,7 +248,9 @@
     "edge_type": "water_supply",
     "weight": 1.0,
     "capacity": 40.0,
-    "is_bidirectional": false
+    "is_bidirectional": false,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "edae1de4-42ba-4dda-b48f-fa63ce88d627",
@@ -213,7 +259,9 @@
     "edge_type": "water_supply",
     "weight": 1.0,
     "capacity": 40.0,
-    "is_bidirectional": false
+    "is_bidirectional": false,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "c0fed96e-a200-4cf8-a068-a2ae73fd2bbc",
@@ -222,7 +270,9 @@
     "edge_type": "power_supply",
     "weight": 1.0,
     "capacity": 20.0,
-    "is_bidirectional": false
+    "is_bidirectional": false,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "9971aea4-a6c8-49be-91aa-ca30c9b7ab5d",
@@ -231,7 +281,9 @@
     "edge_type": "power_supply",
     "weight": 1.0,
     "capacity": 20.0,
-    "is_bidirectional": false
+    "is_bidirectional": false,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "577af79c-53ba-444d-bf37-3b35765eb6d1",
@@ -240,7 +292,9 @@
     "edge_type": "depends_on",
     "weight": 1.0,
     "capacity": 10.0,
-    "is_bidirectional": false
+    "is_bidirectional": false,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "cb04130c-edcb-464f-93c3-97792f7d695a",
@@ -249,7 +303,9 @@
     "edge_type": "depends_on",
     "weight": 1.0,
     "capacity": 10.0,
-    "is_bidirectional": false
+    "is_bidirectional": false,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "ddb755cc-0a5e-4576-844b-bcbc0df270ab",
@@ -258,7 +314,9 @@
     "edge_type": "depends_on",
     "weight": 1.0,
     "capacity": 10.0,
-    "is_bidirectional": false
+    "is_bidirectional": false,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "59aa8839-c041-45bb-bd9c-3281b02feb05",
@@ -267,7 +325,9 @@
     "edge_type": "depends_on",
     "weight": 1.0,
     "capacity": 10.0,
-    "is_bidirectional": false
+    "is_bidirectional": false,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "8f1d6ead-9eff-4191-b7fe-d260cfc0ccd4",
@@ -276,7 +336,9 @@
     "edge_type": "road_link",
     "weight": 0.0013783361179794224,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "a5a0a50a-8c47-4a61-bd35-b83d168c55dc",
@@ -285,7 +347,9 @@
     "edge_type": "road_link",
     "weight": 0.0028414753816001347,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "72ae2669-9ea7-4792-9ccb-163929e29a46",
@@ -294,7 +358,9 @@
     "edge_type": "road_link",
     "weight": 0.003401473993034453,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "c93f995d-3efc-4122-8612-a77dbb9c9d79",
@@ -303,7 +369,9 @@
     "edge_type": "road_link",
     "weight": 0.0030127615612476257,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "06c7a6d8-9c2d-4f9b-8aa0-98a92ff9520d",
@@ -312,7 +380,9 @@
     "edge_type": "road_link",
     "weight": 0.0030261830157677205,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "7ab98e57-4cb7-416a-bf4e-0e495d560664",
@@ -321,7 +391,9 @@
     "edge_type": "road_link",
     "weight": 0.0034080783673015123,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "be328ce1-b449-417e-aba4-cbc5c670aa17",
@@ -330,7 +402,9 @@
     "edge_type": "road_link",
     "weight": 0.0017692935494968292,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "49da512a-e7ee-4490-9067-8d50f5b63c51",
@@ -339,7 +413,9 @@
     "edge_type": "road_link",
     "weight": 0.0027434212648582107,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "bc24407c-45a6-4003-88eb-59485820df67",
@@ -348,7 +424,9 @@
     "edge_type": "road_link",
     "weight": 0.002535366587213382,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "de60b7db-4a08-4dad-94e0-f3432d37758e",
@@ -357,7 +435,9 @@
     "edge_type": "road_link",
     "weight": 0.004204595419296031,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "e5cd3258-97fa-4da9-bc58-0e62648fa6c5",
@@ -366,7 +446,9 @@
     "edge_type": "road_link",
     "weight": 0.004846829657134556,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "fdd40c5f-5af8-4156-9fca-034e9fad742d",
@@ -375,7 +457,9 @@
     "edge_type": "road_link",
     "weight": 0.005026115153734371,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "db9eb52e-2b1c-46bb-ab76-9fdf98aabb44",
@@ -384,7 +468,9 @@
     "edge_type": "road_link",
     "weight": 0.001502621994803975,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "062fc27e-6b2d-411d-81d5-cccf784eace1",
@@ -393,7 +479,9 @@
     "edge_type": "road_link",
     "weight": 3.96892492479564e-05,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "508d651c-6307-4110-acf6-ec45e9ee7055",
@@ -402,7 +490,9 @@
     "edge_type": "road_link",
     "weight": 0.003517029046104712,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "cc6605fa-c10a-4362-92cf-75fb65d1b618",
@@ -411,7 +501,9 @@
     "edge_type": "road_link",
     "weight": 0.001911282082074831,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "51bd3a8d-a216-497a-84a1-63722a5ee716",
@@ -420,7 +512,9 @@
     "edge_type": "road_link",
     "weight": 0.0024711222469307047,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "fdef4b83-0e77-4735-a8f1-5decda364c8f",
@@ -429,7 +523,9 @@
     "edge_type": "road_link",
     "weight": 0.0016639565549704267,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "66df6524-2172-47a4-b4b5-6e86d405e2d3",
@@ -438,7 +534,9 @@
     "edge_type": "road_link",
     "weight": 0.0011462400541816591,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "103bd0f5-e579-47ae-89d1-ba350495ed9e",
@@ -447,7 +545,9 @@
     "edge_type": "road_link",
     "weight": 0.0007382089134062645,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "bfcae0d7-a4ad-4104-89d2-0df1e725d36d",
@@ -456,7 +556,9 @@
     "edge_type": "road_link",
     "weight": 0.0010983152621991741,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "fd98ead6-3485-4f2f-831e-b07a72f89696",
@@ -465,7 +567,9 @@
     "edge_type": "road_link",
     "weight": 0.004318292438327294,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "1d5e713f-1b35-4f38-9701-4941329908b5",
@@ -474,7 +578,9 @@
     "edge_type": "road_link",
     "weight": 0.0006312676148084094,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "1a49f534-0d02-4830-8ae0-bb448fdcf5cc",
@@ -483,7 +589,9 @@
     "edge_type": "road_link",
     "weight": 0.002356883840668564,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "5f72c09a-533a-4a0e-96c7-733cad87f1ce",
@@ -492,7 +600,9 @@
     "edge_type": "road_link",
     "weight": 0.004767616966466973,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "ebf0070b-fb2f-4468-a9e9-a31e124ad0d5",
@@ -501,7 +611,9 @@
     "edge_type": "road_link",
     "weight": 0.004832527787588295,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "ba369273-2026-491c-a1f4-a18fde339922",
@@ -510,7 +622,9 @@
     "edge_type": "road_link",
     "weight": 0.00033986722777415543,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "dbcc471a-e77a-49a5-b81b-faa8b414863e",
@@ -519,7 +633,9 @@
     "edge_type": "road_link",
     "weight": 0.0030324280368763928,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "ca041526-7015-47b4-9205-8b3b7752a469",
@@ -528,7 +644,9 @@
     "edge_type": "road_link",
     "weight": 0.0024083308108359164,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "82ca9d90-6a62-4af4-9ab6-91e1950c620d",
@@ -537,7 +655,9 @@
     "edge_type": "road_link",
     "weight": 0.003448530900825795,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "fece2691-94a2-4610-8ed6-4ece40b02d44",
@@ -546,7 +666,9 @@
     "edge_type": "road_link",
     "weight": 0.0018582374142032039,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "3c8d5d12-46d6-4925-bfe3-53b9f0094e9e",
@@ -555,7 +677,9 @@
     "edge_type": "road_link",
     "weight": 0.0030385655274721454,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "faae23d6-0474-4fc9-879a-f2d52a900abc",
@@ -564,7 +688,9 @@
     "edge_type": "road_link",
     "weight": 0.0007856513352434086,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "e269c6c0-69e0-4b18-b091-1e7985a198b7",
@@ -573,7 +699,9 @@
     "edge_type": "road_link",
     "weight": 0.0019524235951625026,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "d5302070-1e35-482d-b271-340c7a87fd17",
@@ -582,7 +710,9 @@
     "edge_type": "road_link",
     "weight": 0.0024603411090417253,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "3400ab49-f1b6-4387-90a5-fc887284ef44",
@@ -591,7 +721,9 @@
     "edge_type": "road_link",
     "weight": 0.002781487000175174,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "71093cce-ccff-4818-9a12-f99314db3702",
@@ -600,7 +732,9 @@
     "edge_type": "road_link",
     "weight": 0.00014491815286363992,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "efe7f068-bdda-4546-979a-c4a98c1df0fe",
@@ -609,7 +743,9 @@
     "edge_type": "road_link",
     "weight": 0.0038227670495508004,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "323ac73f-591d-4322-a021-ac34bfa48976",
@@ -618,7 +754,9 @@
     "edge_type": "road_link",
     "weight": 0.0035844659550061542,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "c16e902c-efcb-4de9-8d93-a35dbf32145d",
@@ -627,7 +765,9 @@
     "edge_type": "road_link",
     "weight": 0.004096027530285193,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "5aef9ce1-363a-44bb-997b-46ea8da2bee6",
@@ -636,7 +776,9 @@
     "edge_type": "road_link",
     "weight": 0.004147317409156731,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "a5ae6229-cd14-4ea3-8737-503d2884c0b2",
@@ -645,7 +787,9 @@
     "edge_type": "road_link",
     "weight": 0.00063508424887331,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "2a169b7d-1081-464e-a313-8a63c01d60fc",
@@ -654,7 +798,9 @@
     "edge_type": "road_link",
     "weight": 0.0020346561951118105,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "5823816b-daf5-4509-9f77-b312457e1617",
@@ -663,7 +809,9 @@
     "edge_type": "road_link",
     "weight": 0.002667448572497316,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "24158ecf-952d-43a2-b6ec-d018fad1146f",
@@ -672,7 +820,9 @@
     "edge_type": "road_link",
     "weight": 0.0029787405078093745,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "52e3046e-5a41-44c4-bf48-335535721f1b",
@@ -681,7 +831,9 @@
     "edge_type": "road_link",
     "weight": 0.0032714321674355037,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "41c8ee0a-4a3d-4102-9f3b-28d250ad5eca",
@@ -690,7 +842,9 @@
     "edge_type": "road_link",
     "weight": 0.0013715710190465172,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "9802112e-53db-4f54-a546-b8ba1eddd0a2",
@@ -699,7 +853,9 @@
     "edge_type": "road_link",
     "weight": 0.0018151431748224735,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "1ee161f6-2213-4549-b155-492379df1f43",
@@ -708,7 +864,9 @@
     "edge_type": "road_link",
     "weight": 0.0006360750211067354,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "a684c8dd-92fe-4e45-aed7-6f8cafbc3000",
@@ -717,7 +875,9 @@
     "edge_type": "road_link",
     "weight": 0.00138309384084267,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "f48b0c84-aec8-4ed1-b72b-0cb2e0cc750f",
@@ -726,7 +886,9 @@
     "edge_type": "road_link",
     "weight": 0.0033206086479973247,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "46e8d3b0-3336-43e3-b0aa-8b8aa0f3fee6",
@@ -735,7 +897,9 @@
     "edge_type": "road_link",
     "weight": 0.0029555416281586205,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "caf8c4a2-821b-4f65-bb1e-b017ee7c417c",
@@ -744,7 +908,9 @@
     "edge_type": "road_link",
     "weight": 0.0036881234401568907,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "2811fc5e-b2f1-45c7-91a9-c654262d6724",
@@ -753,7 +919,9 @@
     "edge_type": "road_link",
     "weight": 0.0020379940983553647,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "da6182a8-8c79-4df4-9b2b-090c1b9db154",
@@ -762,7 +930,9 @@
     "edge_type": "road_link",
     "weight": 0.0008952657371217149,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "ebd9b024-1e37-44bb-be1d-949f7dfc6a1b",
@@ -771,7 +941,9 @@
     "edge_type": "road_link",
     "weight": 0.001219728217626729,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "df7d049a-cf79-444a-a264-7d5e8b921204",
@@ -780,7 +952,9 @@
     "edge_type": "road_link",
     "weight": 0.004650256789048355,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "e7e67297-8ca6-4850-83a8-e69ca69505ac",
@@ -789,7 +963,9 @@
     "edge_type": "road_link",
     "weight": 0.0058415125705438,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "82574e49-a92b-46c8-929e-1f00cd0805e3",
@@ -798,7 +974,9 @@
     "edge_type": "road_link",
     "weight": 0.0006982449540106562,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "b1bf2c57-6584-4e91-9892-5db528634748",
@@ -807,7 +985,9 @@
     "edge_type": "road_link",
     "weight": 0.0027048166199851974,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "ca096c87-4924-483d-b0c8-758c297dd136",
@@ -816,7 +996,9 @@
     "edge_type": "road_link",
     "weight": 0.0010660834596584122,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "c305398d-3d6d-4d88-a098-c12a83226924",
@@ -825,7 +1007,9 @@
     "edge_type": "road_link",
     "weight": 0.0010136472117724072,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "2f125965-7d38-4d2b-ae4b-5b66995c6018",
@@ -834,7 +1018,9 @@
     "edge_type": "road_link",
     "weight": 0.0010323125130973763,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "e899f5b6-cf73-4567-8fcd-cc36a35682d6",
@@ -843,7 +1029,9 @@
     "edge_type": "road_link",
     "weight": 0.0025108441875268672,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "298bfe58-2755-4888-acc7-467ad7822478",
@@ -852,7 +1040,9 @@
     "edge_type": "road_link",
     "weight": 0.0032094805719660897,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "07aa912d-3e52-4d64-9738-14159a42acd8",
@@ -861,7 +1051,9 @@
     "edge_type": "road_link",
     "weight": 0.0020958448061492298,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "412ec117-ac82-4f4a-a0b5-af3b79cb57e2",
@@ -870,7 +1062,9 @@
     "edge_type": "road_link",
     "weight": 0.0039650842449001295,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "e10494f8-42f0-44f5-a21b-eb3bafd70d6f",
@@ -879,7 +1073,9 @@
     "edge_type": "road_link",
     "weight": 0.001465070386166577,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "dc48cbe3-9e30-4eaf-83bb-b9bef8b67bf7",
@@ -888,7 +1084,9 @@
     "edge_type": "road_link",
     "weight": 0.002818803257443958,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "bb28f4f3-3949-4e92-ae33-370fa14736d6",
@@ -897,7 +1095,9 @@
     "edge_type": "road_link",
     "weight": 0.004342471600992986,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "62b1757c-ebf1-4027-9325-4ad9c5682c0b",
@@ -906,7 +1106,9 @@
     "edge_type": "road_link",
     "weight": 0.003562262063004336,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "367b2ed9-5c42-47cb-b0a2-e3c1ce59b653",
@@ -915,7 +1117,9 @@
     "edge_type": "road_link",
     "weight": 0.0026943285427703293,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "85d75256-9a49-4a2a-b540-232fa04e2359",
@@ -924,7 +1128,9 @@
     "edge_type": "road_link",
     "weight": 0.0022178900949770745,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "f638bdd0-5c4d-4feb-92af-b69351cbc184",
@@ -933,7 +1139,9 @@
     "edge_type": "road_link",
     "weight": 0.0024557894474459573,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "d86ee8b8-1983-4db6-93fa-96af8ac23eab",
@@ -942,7 +1150,9 @@
     "edge_type": "road_link",
     "weight": 0.0024695130159495897,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "d28419d0-5eb0-4400-ac28-7dc1987d564e",
@@ -951,7 +1161,9 @@
     "edge_type": "road_link",
     "weight": 0.0011437069558829485,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "6b034b49-aa32-43b1-a7d5-33deae4f321d",
@@ -960,7 +1172,9 @@
     "edge_type": "road_link",
     "weight": 0.002746981216333756,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "003004b5-6cb0-4822-b013-83ab18fc1a4a",
@@ -969,7 +1183,9 @@
     "edge_type": "road_link",
     "weight": 0.002781973607425879,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "fdc1901f-61d5-4f2d-b7a6-8646df98f950",
@@ -978,7 +1194,9 @@
     "edge_type": "road_link",
     "weight": 0.0025129360942893514,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "d9d90e99-daf8-4ba4-bef2-8f4e28560593",
@@ -987,7 +1205,9 @@
     "edge_type": "road_link",
     "weight": 0.0017436827860241157,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "fd65e3cb-a3ef-40cf-84a2-facabb95c40e",
@@ -996,7 +1216,9 @@
     "edge_type": "road_link",
     "weight": 0.0021273093227795665,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "8dfb4e53-01c8-4da2-9877-dd4f45b0c828",
@@ -1005,7 +1227,9 @@
     "edge_type": "road_link",
     "weight": 0.005160486715958271,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "09b943e4-e678-4ca6-88c6-f3f3f645f444",
@@ -1014,7 +1238,9 @@
     "edge_type": "road_link",
     "weight": 0.0010141671081268172,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "a7018d76-4a95-4321-8a73-157e11ea0227",
@@ -1023,7 +1249,9 @@
     "edge_type": "road_link",
     "weight": 0.002818770485100442,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "af9dd985-7ca9-4083-8a80-be5450b6ce62",
@@ -1032,7 +1260,9 @@
     "edge_type": "road_link",
     "weight": 0.003988077256604485,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "2a029f38-b755-49b8-822b-c6faef5d189c",
@@ -1041,7 +1271,9 @@
     "edge_type": "road_link",
     "weight": 0.0015849823084988488,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "a5f0888a-6b6b-4c34-b719-0a33ffba2fa0",
@@ -1050,7 +1282,9 @@
     "edge_type": "road_link",
     "weight": 0.0032560225391171206,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "c1947f37-5cb8-4d38-bbee-3effbd516ea8",
@@ -1059,7 +1293,9 @@
     "edge_type": "road_link",
     "weight": 0.0037635038073289833,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "75dc3ffd-9687-44e2-8dda-a8d7be438c48",
@@ -1068,7 +1304,9 @@
     "edge_type": "road_link",
     "weight": 0.002118399898504223,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "60e5cb55-da15-4659-befa-0f8253cf03a8",
@@ -1077,7 +1315,9 @@
     "edge_type": "road_link",
     "weight": 0.0027462181806731756,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "fb24c679-0007-4f67-9f12-c3864feeae7e",
@@ -1086,7 +1326,9 @@
     "edge_type": "road_link",
     "weight": 0.0007980917877084987,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "72d81e7a-c192-4c87-ab31-3b049697e259",
@@ -1095,7 +1337,9 @@
     "edge_type": "road_link",
     "weight": 0.00254218657286133,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "07a5d061-daec-472e-916f-96309feb768e",
@@ -1104,7 +1348,9 @@
     "edge_type": "road_link",
     "weight": 0.003082223117270151,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "0728127b-f615-4b86-9ae8-dd33b98e56b6",
@@ -1113,7 +1359,9 @@
     "edge_type": "road_link",
     "weight": 0.0024797696336158162,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "03b3e390-02f1-4cb7-b60b-a1d5e8204bbc",
@@ -1122,7 +1370,9 @@
     "edge_type": "road_link",
     "weight": 0.0020739467266164733,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "f7c42df1-7d2b-4006-a291-29076173ce68",
@@ -1131,7 +1381,9 @@
     "edge_type": "road_link",
     "weight": 0.003083176061874469,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "68676b86-1a9d-434e-804b-8e112b2fc66e",
@@ -1140,7 +1392,9 @@
     "edge_type": "road_link",
     "weight": 0.0015219238793267584,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "6e9bf8d3-363d-46bc-9152-ef90359a7736",
@@ -1149,7 +1403,9 @@
     "edge_type": "road_link",
     "weight": 0.0030699439340432432,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "be2b51b7-a1db-43c1-b635-4f9716b3a83c",
@@ -1158,7 +1414,9 @@
     "edge_type": "road_link",
     "weight": 0.0017855601427856586,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "bd3c9b82-bfa7-432f-a1dd-8a1b6f27c0f4",
@@ -1167,7 +1425,9 @@
     "edge_type": "road_link",
     "weight": 0.003077793308794165,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "7b6cd996-31cf-486b-9ab7-c515451900fc",
@@ -1176,7 +1436,9 @@
     "edge_type": "road_link",
     "weight": 0.002707556482828686,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "caadafec-64e9-46aa-b536-b1e5af052e0b",
@@ -1185,7 +1447,9 @@
     "edge_type": "road_link",
     "weight": 0.0038184695596239237,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "417f49c3-e8ef-4ae1-9815-55258f99c1bc",
@@ -1194,7 +1458,9 @@
     "edge_type": "road_link",
     "weight": 0.004074086450605221,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "2ec38fa7-f5fb-4f17-a63f-9cf23d1f513a",
@@ -1203,7 +1469,9 @@
     "edge_type": "road_link",
     "weight": 0.003556218760794274,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "9fc7a23c-e6e2-4d43-bfa8-37fc689b3d19",
@@ -1212,7 +1480,9 @@
     "edge_type": "road_link",
     "weight": 0.003808266984747068,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "1c71ffde-8361-4729-83a3-38bcc20e0245",
@@ -1221,7 +1491,9 @@
     "edge_type": "road_link",
     "weight": 0.004445908002617161,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "a9adb735-2cbe-44b3-828c-3f37a8d6ddcd",
@@ -1230,7 +1502,9 @@
     "edge_type": "road_link",
     "weight": 0.00446662859827094,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "b2406285-a2d8-4d5f-a5bf-97bbe86400f8",
@@ -1239,7 +1513,9 @@
     "edge_type": "road_link",
     "weight": 0.007090710237506272,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "81ccc199-e6d6-4c66-87cb-1ce529141611",
@@ -1248,7 +1524,9 @@
     "edge_type": "road_link",
     "weight": 0.009260409061467313,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "7117563a-1702-4da5-9157-71f834c76bb1",
@@ -1257,7 +1535,9 @@
     "edge_type": "road_link",
     "weight": 0.005471188156535368,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "c4079a54-3bcf-4093-8cdd-73843f4cee21",
@@ -1266,7 +1546,9 @@
     "edge_type": "road_link",
     "weight": 0.002605785120432138,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "3fb75c34-c29b-47b9-b45c-9a6f172a71c1",
@@ -1275,7 +1557,9 @@
     "edge_type": "road_link",
     "weight": 0.0028681559566143965,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "e553cf5e-b66e-4c4d-b70f-79b16f61f875",
@@ -1284,7 +1568,9 @@
     "edge_type": "road_link",
     "weight": 0.003537385593944655,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "23bcee72-895c-4710-8390-91baf2c4d5e7",
@@ -1293,7 +1579,9 @@
     "edge_type": "road_link",
     "weight": 0.005240019022434895,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "f2cfd3a4-32ef-40b8-b39f-a3bedf319b10",
@@ -1302,7 +1590,9 @@
     "edge_type": "road_link",
     "weight": 0.005279932384244212,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "a7b89425-7bbe-4ab9-bf1c-2109f2f445bd",
@@ -1311,7 +1601,9 @@
     "edge_type": "road_link",
     "weight": 0.0015106222004960964,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "4f17b4d3-daf0-4c32-b202-99868fe390be",
@@ -1320,7 +1612,9 @@
     "edge_type": "road_link",
     "weight": 0.0033977379647593857,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "d08a62e6-d0f9-447d-96fe-a7ca8efe42bf",
@@ -1329,7 +1623,9 @@
     "edge_type": "road_link",
     "weight": 0.004683531174695319,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "735498e8-4600-46c6-a0d4-c349b74fde6d",
@@ -1338,7 +1634,9 @@
     "edge_type": "road_link",
     "weight": 0.00513882250004477,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "b896c253-f2d8-4ffa-8589-f8147664d862",
@@ -1347,7 +1645,9 @@
     "edge_type": "road_link",
     "weight": 0.0030662797676382263,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "374b35a3-a8c3-492b-ad34-19d7108a530f",
@@ -1356,7 +1656,9 @@
     "edge_type": "road_link",
     "weight": 0.004605599110838336,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "8888b70f-4632-45ab-87e8-d4087746599d",
@@ -1365,7 +1667,9 @@
     "edge_type": "road_link",
     "weight": 0.0031304919641379665,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "db968f27-8b2b-48db-bc81-2191ffbc416e",
@@ -1374,7 +1678,9 @@
     "edge_type": "road_link",
     "weight": 0.0014138749841245497,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "f7a9e0a0-1be2-42bf-b662-a96fdf1e187f",
@@ -1383,7 +1689,9 @@
     "edge_type": "road_link",
     "weight": 0.0027417507154559036,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "adad874d-d2fa-4640-ba80-9916af8618c9",
@@ -1392,7 +1700,9 @@
     "edge_type": "road_link",
     "weight": 0.004388671554142705,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "c36fe675-2fec-4de9-82cd-b42561dd7539",
@@ -1401,7 +1711,9 @@
     "edge_type": "road_link",
     "weight": 0.0030058415080934935,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "b82cfe1e-1f75-41ef-bb53-f40e3ea84d1f",
@@ -1410,7 +1722,9 @@
     "edge_type": "road_link",
     "weight": 0.003449678114395032,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "165c0c31-02dd-46fc-8110-e855c0e4e3b7",
@@ -1419,7 +1733,9 @@
     "edge_type": "road_link",
     "weight": 0.0030957991610796,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "9f1f71aa-601f-4abd-9a31-368f4b53eed6",
@@ -1428,7 +1744,9 @@
     "edge_type": "road_link",
     "weight": 0.00466335780888087,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "742edea3-2feb-487e-b572-0803d6bcace6",
@@ -1437,7 +1755,9 @@
     "edge_type": "road_link",
     "weight": 0.00326754177062816,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "7ad50c17-7aab-4a78-8366-7349af496ea7",
@@ -1446,7 +1766,9 @@
     "edge_type": "road_link",
     "weight": 0.005110742928324431,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "66af7c5a-2e21-4708-939d-7211004ad27a",
@@ -1455,7 +1777,9 @@
     "edge_type": "road_link",
     "weight": 0.005229799129411311,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "bbc094f6-4c7b-4c9b-ae5c-02f30b0181cc",
@@ -1464,7 +1788,9 @@
     "edge_type": "road_link",
     "weight": 0.0029852291165056864,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "dabffca6-b6f5-4d1a-ae96-73aa26226cd1",
@@ -1473,7 +1799,9 @@
     "edge_type": "road_link",
     "weight": 0.003038791917930349,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "88362e3d-d4ea-4187-ae08-66350a605ddd",
@@ -1482,7 +1810,9 @@
     "edge_type": "road_link",
     "weight": 0.00249694079959711,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "e178c0f3-02b3-44af-a06a-b71e5011f541",
@@ -1491,7 +1821,9 @@
     "edge_type": "road_link",
     "weight": 0.005069613702210395,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "f3e289ff-4c03-4d43-91fb-3c4b6d9a9b6a",
@@ -1500,7 +1832,9 @@
     "edge_type": "road_link",
     "weight": 0.005030098176732276,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "cb65a5a9-6e5f-44c8-85c1-3a8c77714e7e",
@@ -1509,7 +1843,9 @@
     "edge_type": "road_link",
     "weight": 0.005496089992030658,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "eed835d2-6dee-44ec-aa31-df845767bea7",
@@ -1518,7 +1854,9 @@
     "edge_type": "road_link",
     "weight": 0.004482858890455969,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "885e2c6e-e11b-4c0f-a01c-29af320b83fd",
@@ -1527,7 +1865,9 @@
     "edge_type": "road_link",
     "weight": 0.004695940734100632,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "2e6db266-a410-4ce2-85bd-2524654b3648",
@@ -1536,7 +1876,9 @@
     "edge_type": "road_link",
     "weight": 0.0030222966872983513,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "1671be95-6ba8-4e92-add8-85a888eaec6a",
@@ -1545,7 +1887,9 @@
     "edge_type": "road_link",
     "weight": 0.002449256752701888,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "e32e48a4-7600-4d33-bcad-b26fad824083",
@@ -1554,7 +1898,9 @@
     "edge_type": "road_link",
     "weight": 0.0034028062796897306,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "d903c24c-9017-44f9-b21f-e1a3b4892b8c",
@@ -1563,7 +1909,9 @@
     "edge_type": "road_link",
     "weight": 0.0026053494547293673,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "c3517a71-21bc-4d6c-96ab-05fd80d3d58e",
@@ -1572,7 +1920,9 @@
     "edge_type": "road_link",
     "weight": 0.005043613404908138,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "ed5c6bb9-773e-461a-a04e-f110eec45ca1",
@@ -1581,7 +1931,9 @@
     "edge_type": "road_link",
     "weight": 0.002796736044547216,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "a491f68b-109b-451c-b32a-f58ab9a698bc",
@@ -1590,7 +1942,9 @@
     "edge_type": "road_link",
     "weight": 0.0025065859048849994,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "2a9c0ae4-255b-4e33-880d-49adc33264e3",
@@ -1599,7 +1953,9 @@
     "edge_type": "road_link",
     "weight": 0.0031878595388544944,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "9c16fa79-3931-4236-8095-859fc7c9abf7",
@@ -1608,7 +1964,9 @@
     "edge_type": "road_link",
     "weight": 0.0030975149646135704,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "865c1e89-76b0-43d8-bfc0-3fbe8d09b565",
@@ -1617,7 +1975,9 @@
     "edge_type": "road_link",
     "weight": 0.0032333748416676824,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "b816c5cc-d093-452e-998e-ac0ef5c12674",
@@ -1626,7 +1986,9 @@
     "edge_type": "road_link",
     "weight": 0.0020963828852103945,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "b05594cf-9411-4545-ad99-a28474ad1ebb",
@@ -1635,7 +1997,9 @@
     "edge_type": "road_link",
     "weight": 0.004268828288767402,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "806df1b2-2acf-432a-812a-c59391ecb4f2",
@@ -1644,7 +2008,9 @@
     "edge_type": "road_link",
     "weight": 0.0052338934928965524,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "5291d4db-2bc6-4025-a4bf-cb7f267204a7",
@@ -1653,7 +2019,9 @@
     "edge_type": "road_link",
     "weight": 0.003966824711762982,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "a3d365ad-74dd-4a08-97d1-0bcadf9c1216",
@@ -1662,7 +2030,9 @@
     "edge_type": "road_link",
     "weight": 0.0029767417005876996,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "14d81a16-0000-4ec5-bc4b-fbfad1c1695d",
@@ -1671,7 +2041,9 @@
     "edge_type": "road_link",
     "weight": 0.00354674590171967,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "8e45670b-3661-4bef-a251-a70790269c30",
@@ -1680,7 +2052,9 @@
     "edge_type": "road_link",
     "weight": 0.004797908583138527,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "dce5dd41-0cec-43cc-bb06-8baf7f8729ea",
@@ -1689,7 +2063,9 @@
     "edge_type": "road_link",
     "weight": 0.003282147756652507,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "be593033-5ded-4160-be44-a8ee3990a15d",
@@ -1698,7 +2074,9 @@
     "edge_type": "road_link",
     "weight": 0.004933530144769927,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "dea719c6-c968-4eec-a824-5b4d892e3296",
@@ -1707,7 +2085,9 @@
     "edge_type": "road_link",
     "weight": 0.00464597180559278,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "d2be71d6-f254-4c8e-87ca-421bdb4380d4",
@@ -1716,7 +2096,9 @@
     "edge_type": "road_link",
     "weight": 0.005287776452260042,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "56d52562-d6de-4e24-8bfe-314a464a61e0",
@@ -1725,7 +2107,9 @@
     "edge_type": "road_link",
     "weight": 0.003116887262261865,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "7d68045f-834a-4f76-acca-bac6cc6ecdd9",
@@ -1734,7 +2118,9 @@
     "edge_type": "road_link",
     "weight": 0.004024377991587998,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "844c96dd-8912-42b2-bd96-6e35575d4d66",
@@ -1743,7 +2129,9 @@
     "edge_type": "road_link",
     "weight": 0.0036040137478585074,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "66e4ccbb-0026-4ccf-a62a-1b60b2c8da72",
@@ -1752,7 +2140,9 @@
     "edge_type": "road_link",
     "weight": 0.0010628167465872853,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "b24c4b94-6819-4bf2-af26-e7243f38b2b3",
@@ -1761,7 +2151,9 @@
     "edge_type": "road_link",
     "weight": 0.0013059646549285547,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "63ff4c48-3621-4664-8079-4ef91e9b18b4",
@@ -1770,7 +2162,9 @@
     "edge_type": "road_link",
     "weight": 0.001647198763709753,
     "capacity": 100.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "4666d7e7-1249-4498-bf58-c991f076f4de",
@@ -1779,7 +2173,9 @@
     "edge_type": "road_link",
     "weight": 0.0023218386965576728,
     "capacity": 60.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "18e0c394-ae00-4662-8e79-d358161c2c34",
@@ -1788,7 +2184,9 @@
     "edge_type": "road_link",
     "weight": 0.0012503131022539862,
     "capacity": 60.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "b961b997-7445-4720-86c8-b7993e542af7",
@@ -1797,7 +2195,9 @@
     "edge_type": "road_link",
     "weight": 0.0010773792813289528,
     "capacity": 60.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "e46a252e-00fa-4ae6-a48b-41995908ff37",
@@ -1806,7 +2206,9 @@
     "edge_type": "road_link",
     "weight": 0.0018987553367206425,
     "capacity": 60.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "78568ec6-9ca1-4b3f-90bc-505ba92cc9dc",
@@ -1815,7 +2217,9 @@
     "edge_type": "road_link",
     "weight": 0.00170176806689354,
     "capacity": 60.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "888ec147-017c-4853-bedf-490e93deb12f",
@@ -1824,7 +2228,9 @@
     "edge_type": "road_link",
     "weight": 0.0009652334589240906,
     "capacity": 60.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "f5faf367-73dc-4f4e-9570-5827d6ff1754",
@@ -1833,7 +2239,9 @@
     "edge_type": "road_link",
     "weight": 0.0038024765089983035,
     "capacity": 60.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "c47decb0-005b-440e-87d2-1c845d6637e8",
@@ -1842,7 +2250,9 @@
     "edge_type": "road_link",
     "weight": 0.0012212239307878194,
     "capacity": 60.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "90e4b5f8-1c79-40ef-ac80-85aa2e7b0973",
@@ -1851,7 +2261,9 @@
     "edge_type": "road_link",
     "weight": 0.002695555716621497,
     "capacity": 60.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "f475aade-a361-4d9a-9f3d-9dfb909da0df",
@@ -1860,7 +2272,9 @@
     "edge_type": "road_link",
     "weight": 0.002375899278647308,
     "capacity": 60.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "84c1f394-1090-4bd6-83ca-5b63f5e00579",
@@ -1869,7 +2283,9 @@
     "edge_type": "road_link",
     "weight": 0.0015065109077444737,
     "capacity": 60.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "8014892e-88c3-40a8-b4f7-7adacbfb0717",
@@ -1878,7 +2294,9 @@
     "edge_type": "road_link",
     "weight": 0.0032468848671155545,
     "capacity": 60.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "c83ed6d2-85d6-4487-9f7b-df03e5e599e9",
@@ -1887,7 +2305,9 @@
     "edge_type": "road_link",
     "weight": 0.0018058527358009956,
     "capacity": 60.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "f06b077e-ca0d-4f7f-b97e-8fbe6bc7b026",
@@ -1896,7 +2316,9 @@
     "edge_type": "road_link",
     "weight": 0.0010028891864504361,
     "capacity": 60.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "b798b4ee-de59-4c3f-bab2-3e959ad8a53a",
@@ -1905,7 +2327,9 @@
     "edge_type": "road_link",
     "weight": 0.001999638546326532,
     "capacity": 60.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "27933f46-6267-4550-9fda-eb5b47a85848",
@@ -1914,7 +2338,9 @@
     "edge_type": "road_link",
     "weight": 0.0027199730120535406,
     "capacity": 60.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "81fe3328-3a00-4950-aad9-0669c5592329",
@@ -1923,7 +2349,9 @@
     "edge_type": "road_link",
     "weight": 0.0013579093332142542,
     "capacity": 60.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "61c7f938-002e-42df-aae8-cc81083d123f",
@@ -1932,7 +2360,9 @@
     "edge_type": "road_link",
     "weight": 0.0020793620486290734,
     "capacity": 60.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "2963ff0f-bba4-4b0e-bd92-cf86fcd48b9f",
@@ -1941,7 +2371,9 @@
     "edge_type": "road_link",
     "weight": 0.000289540053690386,
     "capacity": 60.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   },
   {
     "id": "fa347550-b431-4d68-9e9c-b048c7c1b0f3",
@@ -1950,6 +2382,8 @@
     "edge_type": "road_link",
     "weight": 0.0013370896270599344,
     "capacity": 60.0,
-    "is_bidirectional": true
+    "is_bidirectional": true,
+    "is_synthetic": true,
+    "data_source": "synthetic"
   }
 ]

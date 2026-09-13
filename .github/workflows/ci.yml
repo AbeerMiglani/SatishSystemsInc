@@ -24,7 +24,7 @@ jobs:
       - name: Run Linting
         run: |
           cd backend
-          flake8 app tests || true
+          flake8 app tests
       - name: Run Tests
         run: |
           cd backend
