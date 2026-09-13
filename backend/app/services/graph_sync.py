@@ -41,6 +41,7 @@ def sync_network_to_neo4j(db: Session, network_id: str):
             "id": str(n.id),
             "network_id": str(n.network_id),
             "name": n.name,
+            "display_name": getattr(n, "display_name", None) or n.name,
             "type": n.node_type,
             "lat": n.lat,
             "lng": n.lng,
@@ -48,6 +49,10 @@ def sync_network_to_neo4j(db: Session, network_id: str):
             "current_load": n.current_load,
             "failure_threshold": n.failure_threshold,
             "status": n.status,
+            "is_synthetic": getattr(n, "is_synthetic", True),
+            "data_source": getattr(n, "data_source", "synthetic"),
+            "name_source": getattr(n, "name_source", "synthetic") or "synthetic",
+            "data_quality": getattr(n, "data_quality", "verified") or "verified",
         }
         for n in nodes
     ]
@@ -86,13 +91,18 @@ def sync_network_to_neo4j(db: Session, network_id: str):
                 id: node.id,
                 network_id: node.network_id,
                 name: node.name,
+                display_name: node.display_name,
                 type: node.type,
                 lat: node.lat,
                 lng: node.lng,
                 capacity: node.capacity,
                 current_load: node.current_load,
                 failure_threshold: node.failure_threshold,
-                status: node.status
+                status: node.status,
+                is_synthetic: node.is_synthetic,
+                data_source: node.data_source,
+                name_source: node.name_source,
+                data_quality: node.data_quality
             })
             """,
             nodes=node_dicts,

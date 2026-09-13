@@ -20,7 +20,6 @@ class Base(DeclarativeBase):
     """Declarative base for all ORM models."""
 
 
-
 def get_db():
     """FastAPI dependency — yields a DB session and ensures cleanup."""
     db = SessionLocal()

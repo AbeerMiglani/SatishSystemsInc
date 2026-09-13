@@ -2,7 +2,7 @@
 """
 Generate a synthetic infrastructure network for Manipal, India.
 
-Outputs two GeoJSON files (nodes.geojson, edges.geojson) in the data/seed/ directory.
+Outputs two files (nodes.geojson, edges.json) in the data/seed/ directory.
 Asserts that the graph is connected (specifically: no isolated components, and
 every hospital is reachable from at least one power substation).
 
@@ -14,11 +14,12 @@ Road Junctions connect to each other and nearby facilities
 """
 
 import json
-import uuid
-import random
 import math
 import os
+import random
+import uuid
 from pathlib import Path
+
 import networkx as nx
 
 # --- Config ---
@@ -62,26 +63,27 @@ def generate_nodes():
             lat, lng = random_point_near(MANIPAL_CENTER, RADIUS_DEG)
             
             # Base stats depend on type with varying headroom (40-90% load)
+            # Consistent, realistic synthetic naming scheme without fabricating real institutions
             if ntype == "power_substation":
                 # High criticality, low headroom
                 cap, load, pop = 100.0, random.uniform(80, 90), random.randint(10000, 30000)
-                name = f"Substation {i+1}"
+                name = f"Grid Substation PS-{i+1:02d}"
             elif ntype == "water_station":
                 # Moderate headroom
                 cap, load, pop = 80.0, random.uniform(65, 76), random.randint(15000, 25000)
-                name = f"Water Pump {i+1}"
+                name = f"Water Facility WS-{i+1:02d}"
             elif ntype == "hospital":
                 # High headroom (critical backup generators)
                 cap, load, pop = 60.0, random.uniform(40, 60), random.randint(1000, 5000)
-                name = f"Hospital {i+1}"
+                name = f"Hospital MC-{i+1:02d}"
             elif ntype == "telecom_tower":
                 # Variable headroom
                 cap, load, pop = 40.0, random.uniform(25, 35), random.randint(5000, 15000)
-                name = f"Cell Tower {i+1}"
+                name = f"Cell Tower TC-{i+1:02d}"
             else:
                 # Road junction - huge capacity, very high headroom so failures don't instantly collapse the grid
                 cap, load, pop = 200.0, random.uniform(50, 70), 0
-                name = f"Junction {i+1}"
+                name = f"Road Junction RJ-{i+1:02d}"
                 
             nodes.append({
                 "id": str(uuid.uuid4()),
@@ -93,7 +95,9 @@ def generate_nodes():
                 "current_load": load,
                 "failure_threshold": 1.0,
                 "population_served": pop,
-                "status": "operational"
+                "status": "operational",
+                "is_synthetic": True,
+                "data_source": "synthetic"
             })
             
     return nodes
@@ -122,7 +126,9 @@ def generate_edges(nodes):
                 "edge_type": "power_supply",
                 "weight": 1.0,
                 "capacity": 50.0,
-                "is_bidirectional": False
+                "is_bidirectional": False,
+                "is_synthetic": True,
+                "data_source": "synthetic"
             })
 
     # 2. Power -> Hospital (each hospital gets power from 2 closest substations)
@@ -136,7 +142,9 @@ def generate_edges(nodes):
                 "edge_type": "power_supply",
                 "weight": 1.0,
                 "capacity": 30.0,
-                "is_bidirectional": False
+                "is_bidirectional": False,
+                "is_synthetic": True,
+                "data_source": "synthetic"
             })
 
     # 3. Water -> Hospital (each hospital gets water from 1 closest water station)
@@ -149,7 +157,9 @@ def generate_edges(nodes):
             "edge_type": "water_supply",
             "weight": 1.0,
             "capacity": 40.0,
-            "is_bidirectional": False
+            "is_bidirectional": False,
+            "is_synthetic": True,
+            "data_source": "synthetic"
         })
         
     # 4. Power -> Telecom
@@ -162,7 +172,9 @@ def generate_edges(nodes):
             "edge_type": "power_supply",
             "weight": 1.0,
             "capacity": 20.0,
-            "is_bidirectional": False
+            "is_bidirectional": False,
+            "is_synthetic": True,
+            "data_source": "synthetic"
         })
         
     # 5. Hospital -> Telecom (Dependency)
@@ -175,7 +187,9 @@ def generate_edges(nodes):
             "edge_type": "depends_on",
             "weight": 1.0,
             "capacity": 10.0,
-            "is_bidirectional": False
+            "is_bidirectional": False,
+            "is_synthetic": True,
+            "data_source": "synthetic"
         })
 
     # 6. Road network
@@ -200,7 +214,9 @@ def generate_edges(nodes):
             "edge_type": "road_link",
             "weight": mst[u][v]["weight"],
             "capacity": 100.0,
-            "is_bidirectional": True
+            "is_bidirectional": True,
+            "is_synthetic": True,
+            "data_source": "synthetic"
         })
         added_edges.add(tuple(sorted([u, v])))
         
@@ -221,7 +237,9 @@ def generate_edges(nodes):
                         "edge_type": "road_link",
                         "weight": dist,
                         "capacity": 100.0,
-                        "is_bidirectional": True
+                        "is_bidirectional": True,
+                        "is_synthetic": True,
+                        "data_source": "synthetic"
                     })
                     added_edges.add(edge_tuple)
     # Connect non-road facilities to nearest road junction
@@ -235,7 +253,9 @@ def generate_edges(nodes):
                 "edge_type": "road_link",
                 "weight": distance((n["lat"], n["lng"]), (closest_rj["lat"], closest_rj["lng"])),
                 "capacity": 60.0,
-                "is_bidirectional": True
+                "is_bidirectional": True,
+                "is_synthetic": True,
+                "data_source": "synthetic"
             })
 
     return edges

@@ -1,58 +1,55 @@
+"""
+Population impact calculation service for the Ripple simulator.
+Provides zone-capped population estimation and unresolved overlap detection.
+"""
+
 from __future__ import annotations
 
-from collections.abc import Iterable
-
+from typing import Any
 import networkx as nx
 
 STUDY_AREA_POPULATION_CAP = 65_000
 
 
 def calculate_population_impact(
-    failed_node_ids: Iterable[str],
-    graph: nx.DiGraph,
-    population_cap: int = STUDY_AREA_POPULATION_CAP,
-) -> int:
-    """Return a deterministic, capped estimate for uniquely failed nodes.
-
-    The current synthetic dataset stores population exposure on nodes rather
-    than spatial zones. Counting each failed node at most once prevents repeat
-    counting when a caller supplies duplicate IDs; the cap prevents the
-    estimate from exceeding the documented study-area population.
+    failed_node_ids: set[str] | list[str],
+    G_baseline: nx.DiGraph | None = None,
+    study_area_cap: int = STUDY_AREA_POPULATION_CAP,
+    **kwargs: Any,
+) -> dict[str, Any]:
     """
-    grouped: dict[str, int] = {}
-    for node_id in set(failed_node_ids):
-        if node_id not in graph:
-            continue
-        data = graph.nodes[node_id]
-        zone_id = data.get("population_zone_id")
-        key = str(zone_id) if zone_id else f"node:{node_id}"
-        grouped[key] = max(grouped.get(key, 0), max(0, int(data.get("population_served", 0))))
-    affected = sum(grouped.values())
-    return min(affected, max(0, population_cap))
+    Computes population impact with municipal cap and unresolved overlap detection.
 
+    Guarantees:
+    1. population_affected_estimate never exceeds study_area_cap.
+    2. is_population_capped is True iff raw_sum > study_area_cap.
+    3. has_unresolved_overlap is True iff >= 2 nodes with population_served > 0 fail.
+    """
+    graph = G_baseline if G_baseline is not None else kwargs.get("G")
+    if graph is None:
+        raise ValueError("A baseline NetworkX DiGraph must be provided.")
 
-def calculate_population_impact_details(
-    failed_node_ids: Iterable[str],
-    graph: nx.DiGraph,
-    population_cap: int = STUDY_AREA_POPULATION_CAP,
-) -> dict[str, object]:
-    """Return additive impact metadata for legacy node-exposure networks."""
-    unique_failed = set(failed_node_ids)
-    grouped: dict[str, int] = {}
-    for node_id in unique_failed:
-        if node_id not in graph:
-            continue
-        data = graph.nodes[node_id]
-        zone_id = data.get("population_zone_id")
-        key = str(zone_id) if zone_id else f"node:{node_id}"
-        grouped[key] = max(grouped.get(key, 0), max(0, int(data.get("population_served", 0))))
-    raw = sum(grouped.values())
-    affected = min(raw, max(0, population_cap))
+    failed_set = set(failed_node_ids)
+    raw_sum = sum(
+        int(graph.nodes[nid].get("population_served", 0))
+        for nid in failed_set
+        if nid in graph.nodes
+    )
+    is_capped = raw_sum > study_area_cap
+    capped_estimate = min(raw_sum, study_area_cap)
+
+    populated_failed_count = sum(
+        1
+        for nid in failed_set
+        if nid in graph.nodes and int(graph.nodes[nid].get("population_served", 0)) > 0
+    )
+    has_unresolved_overlap = populated_failed_count >= 2
+
     return {
-        "population_total": max(0, population_cap),
-        "population_affected_estimate": affected,
-        "population_affected_percentage": (affected / population_cap * 100) if population_cap else 0.0,
-        "population_overlap_unresolved": True,
-        "population_estimate_is_capped": raw > affected,
-        "population_impact_method": "zone_grouped_node_exposure" if grouped else "legacy_node_exposure",
+        "raw_sum": raw_sum,
+        "raw_population_affected": raw_sum,
+        "population_affected_estimate": capped_estimate,
+        "study_area_population_cap": study_area_cap,
+        "is_population_capped": is_capped,
+        "has_unresolved_overlap": has_unresolved_overlap,
     }

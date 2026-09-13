@@ -16,6 +16,8 @@ from app.services.graph_sync import clear_network_from_neo4j, sync_network_to_ne
 
 # In Docker, the data directory is mounted at /data
 SEED_DIR = Path("/data/seed")
+if not SEED_DIR.exists():
+    SEED_DIR = Path(__file__).resolve().parents[3] / "data" / "seed"
 SEED_NETWORK_NAME = "Manipal Demo Network"
 logger = logging.getLogger(__name__)
 
@@ -62,9 +64,7 @@ def ingest_seed_data(db: Session, force: bool = False) -> str:
                     id=props["id"],
                     network_id=net_id,
                     name=props["name"],
-                    display_name_value=props["name"],
-                    name_source="synthetic",
-                    data_quality="estimated",
+                    display_name=props.get("display_name") or props["name"],
                     node_type=props["node_type"],
                     lat=coords[1],
                     lng=coords[0],
@@ -74,6 +74,10 @@ def ingest_seed_data(db: Session, force: bool = False) -> str:
                     failure_threshold=props["failure_threshold"],
                     population_served=props["population_served"],
                     status=props["status"],
+                    is_synthetic=props.get("is_synthetic", True),
+                    data_source=props.get("data_source", "synthetic"),
+                    name_source=props.get("name_source", "synthetic"),
+                    data_quality=props.get("data_quality", "verified"),
                 )
             )
         db.add_all(node_objects)
@@ -102,17 +106,9 @@ def ingest_seed_data(db: Session, force: bool = False) -> str:
         clear_network_from_neo4j(replaced_network_id)
     sync_network_to_neo4j(db, str(net_id))
     try:
-        get_redis_client().delete(
-            f"centrality:betweenness:{net_id}",
-            f"centrality:pagerank:{net_id}",
-            f"centrality:{net_id}",
-        )
+        get_redis_client().delete(f"centrality:{net_id}")
         if replaced_network_id:
-            get_redis_client().delete(
-                f"centrality:betweenness:{replaced_network_id}",
-                f"centrality:pagerank:{replaced_network_id}",
-                f"centrality:{replaced_network_id}",
-            )
+            get_redis_client().delete(f"centrality:{replaced_network_id}")
     except Exception:
         logger.warning("could not invalidate centrality cache for %s", net_id, exc_info=True)
 

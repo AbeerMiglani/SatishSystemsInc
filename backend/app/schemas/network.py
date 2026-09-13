@@ -1,14 +1,15 @@
-from datetime import datetime
+from __future__ import annotations
 
-from pydantic import UUID4, BaseModel, ConfigDict
+from datetime import datetime
+from typing import Optional
+
+from pydantic import UUID4, BaseModel, ConfigDict, model_validator
 
 
 class NodeBase(BaseModel):
     id: UUID4
     name: str
-    display_name: str
-    name_source: str = "synthetic"
-    data_quality: str = "estimated"
+    display_name: Optional[str] = None
     node_type: str
     lat: float
     lng: float
@@ -17,8 +18,18 @@ class NodeBase(BaseModel):
     failure_threshold: float
     population_served: int
     status: str
+    is_synthetic: bool = True
+    data_source: str = "synthetic"
+    name_source: str = "synthetic"
+    data_quality: str = "verified"
 
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="after")
+    def set_default_display_name(self):
+        if not self.display_name:
+            self.display_name = self.name
+        return self
 
 
 class EdgeBase(BaseModel):
@@ -44,7 +55,20 @@ class NetworkBase(BaseModel):
 
 class CentralityScore(BaseModel):
     node_id: UUID4
-    display_name: str | None = None
-    metric: str = "betweenness"
+    name: str
+    display_name: Optional[str] = None
+    node_type: str
+    is_synthetic: bool = True
+    data_source: str = "synthetic"
+    name_source: str = "synthetic"
+    data_quality: str = "verified"
     score: float
     rank: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="after")
+    def set_default_display_name(self):
+        if not self.display_name:
+            self.display_name = self.name
+        return self

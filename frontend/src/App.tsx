@@ -5,6 +5,8 @@ import GraphView from "./components/GraphView";
 import ControlPanel from "./components/ControlPanel";
 import CriticalityPanel from "./components/CriticalityPanel";
 import ScenarioCompare from "./components/ScenarioCompare";
+import RecommendationPanel from "./components/RecommendationPanel";
+import CascadeTimeline from "./components/CascadeTimeline";
 import { useNetworks, useNetworkTopology } from "./api/hooks";
 import { useUIStore } from "./stores/uiStore";
 
@@ -88,15 +90,17 @@ const App: React.FC = () => {
           <div style={{ padding: "8px 16px", background: "#1e293b", borderBottom: "1px solid #334155", fontWeight: "bold", display: "flex", justifyContent: "space-between" }}>
             <span>Geographic Map</span>
           </div>
-          <div style={{ flex: 1, position: "relative" }}>
+          <div style={{ flex: 1, overflow: "hidden" }}>
             <MapView nodes={topology.nodes} edges={topology.edges} />
           </div>
+          <CascadeTimeline />
         </div>
 
         {/* Right: Controls & Criticality */}
         <div style={{ width: "320px", display: "flex", flexDirection: "column", background: "#0f172a", overflowY: "auto" }}>
           <ControlPanel />
           <CriticalityPanel />
+          <RecommendationPanel />
           <ScenarioCompare />
         </div>
       </main>
