@@ -3,6 +3,8 @@ import { useUIStore } from "../stores/uiStore";
 import { useSimulationStore } from "../stores/simulationStore";
 import { useRunSimulation, useSimulationResult, useCreateScenario, useNetworkTopology } from "../api/hooks";
 import type { InfraNode } from "../types";
+import CascadeTimeline from "./CascadeTimeline";
+import RecommendationPanel from "./RecommendationPanel";
 
 const ControlPanel: React.FC = () => {
   const mode = useUIStore((s) => s.mode);
@@ -23,7 +25,8 @@ const ControlPanel: React.FC = () => {
     return map;
   }, [topology]);
 
-  const { result, currentWave, isPlaying, play, pause, reset, setSimulationResult } = useSimulationStore();
+  const { result, reset, setSimulationResult } = useSimulationStore();
+  const [dismissedSimulationIds, setDismissedSimulationIds] = useState<Set<string>>(new Set());
   
   const simMutation = useRunSimulation();
   const createScenarioMutation = useCreateScenario();
@@ -32,7 +35,7 @@ const ControlPanel: React.FC = () => {
 
   useEffect(() => {
     if (polledResult && polledResult.status === "completed") {
-      if (!result || result.id !== polledResult.id) {
+      if (!dismissedSimulationIds.has(polledResult.id) && (!result || result.id !== polledResult.id)) {
         setSimulationResult(polledResult);
       }
       try {
@@ -49,7 +52,7 @@ const ControlPanel: React.FC = () => {
         }
       } catch {}
     }
-  }, [polledResult, result, setSimulationResult]);
+  }, [polledResult, result, dismissedSimulationIds, setSimulationResult]);
 
   const handleRunBaseline = () => {
     if (!networkId || selectedNodeIds.size === 0) return;
@@ -103,6 +106,17 @@ const ControlPanel: React.FC = () => {
       console.error(e);
       alert("Failed to create scenario: " + e);
     }
+  };
+
+  const handleResetTimeline = () => {
+    if (result?.status === "completed") {
+      setDismissedSimulationIds((prev) => {
+        const next = new Set(prev);
+        next.add(result.id);
+        return next;
+      });
+    }
+    reset();
   };
 
   const isRunning = simMutation.isPending || (polledResult && polledResult.status !== "completed" && polledResult.status !== "failed");
@@ -327,27 +341,8 @@ const ControlPanel: React.FC = () => {
         </div>
       )}
 
-      {result && result.waves.length > 0 && (
-        <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <span style={{ fontSize: 14 }}>Wave: {currentWave} / {result.waves.length - 1}</span>
-          </div>
-          <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-            <button
-              onClick={isPlaying ? pause : play}
-              style={{ flex: 1, padding: "6px", background: "#3b82f6", color: "white", border: "none", borderRadius: 4, cursor: "pointer" }}
-            >
-              {isPlaying ? "Pause" : "Play Animation"}
-            </button>
-            <button
-              onClick={reset}
-              style={{ padding: "6px 12px", background: "#334155", color: "white", border: "none", borderRadius: 4, cursor: "pointer" }}
-            >
-              Reset
-            </button>
-          </div>
-        </div>
-      )}
+      {result && result.waves.length > 0 && <CascadeTimeline />}
+      <RecommendationPanel />
     </div>
   );
 };

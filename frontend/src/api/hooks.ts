@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import type { InfraNode, InfraEdge, CentralityScore, Recommendation, SimulationResult } from "../types";
+import type { InfraNode, InfraEdge, CentralityScore, MitigationRecommendation, SimulationResult } from "../types";
 
 // ---------------------------------------------------------------------------
 // Networks
@@ -98,7 +98,7 @@ export function useRecommendations(simId: string | null) {
         const data = await res.json();
         throw new Error(data.detail || "Failed to fetch recommendations");
       }
-      return res.json() as Promise<{ simulation_id: string; recommendations: Recommendation[] }>;
+      return res.json() as Promise<{ simulation_id: string; recommendations: MitigationRecommendation[] }>;
     },
     enabled: !!simId,
   });

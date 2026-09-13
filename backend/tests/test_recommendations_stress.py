@@ -138,6 +138,11 @@ if _need_mock("geoalchemy2"):
     mock_geo.Geometry = MagicMock()
 
 if "app.db.postgres" not in sys.modules:
+    if "MockBase" not in globals():
+        from sqlalchemy.orm import DeclarativeBase
+
+        class MockBase(DeclarativeBase):
+            pass
     mock_app_db_pg = _make_mock_module("app.db.postgres")
     mock_app_db_pg.Base = MockBase
     mock_app_db_pg.engine = MagicMock()
@@ -722,4 +727,3 @@ def test_stress_harmful_edge_never_recommended():
     for r in recs:
         assert r.failures_prevented >= 0, f"Harmful candidate proposed with negative failures prevented: {r}"
         assert r.raw_population_saved >= 0, f"Harmful candidate proposed with negative population saved: {r}"
-

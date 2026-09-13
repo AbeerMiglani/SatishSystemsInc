@@ -35,8 +35,8 @@ def _to_deterministic_uuid4(val: Any) -> uuid.UUID:
             return u
     except (ValueError, AttributeError):
         pass
-    # Generate RFC 4122 compliant deterministic UUID4 from md5 hash
-    h = bytearray(hashlib.md5(val_str.encode("utf-8")).digest())
+    # Generate an RFC 4122 compliant deterministic UUID4 from a secure digest.
+    h = bytearray(hashlib.blake2b(val_str.encode("utf-8"), digest_size=16).digest())
     h[6] = (h[6] & 0x0F) | 0x40  # Version 4
     h[8] = (h[8] & 0x3F) | 0x80  # Variant RFC 4122
     return uuid.UUID(bytes=bytes(h))

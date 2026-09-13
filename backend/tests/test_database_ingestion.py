@@ -123,6 +123,19 @@ if (
 
     sys.modules["sqlalchemy"] = mock_sa
     sys.modules["sqlalchemy.orm"] = mock_sa_orm
+
+if "app.db.postgres" not in sys.modules:
+    from sqlalchemy.orm import DeclarativeBase
+
+    class TestBase(DeclarativeBase):
+        pass
+
+    mock_app_db_pg = ModuleType("app.db.postgres")
+    mock_app_db_pg.Base = TestBase
+    mock_app_db_pg.engine = MagicMock()
+    mock_app_db_pg.SessionLocal = MagicMock()
+    mock_app_db_pg.get_db = MagicMock()
+    sys.modules["app.db.postgres"] = mock_app_db_pg
     sys.modules["sqlalchemy.dialects"] = mock_sa_dialects
     sys.modules["sqlalchemy.dialects.postgresql"] = mock_sa_pg
 
