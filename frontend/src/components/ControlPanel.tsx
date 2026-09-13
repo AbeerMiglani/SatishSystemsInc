@@ -171,7 +171,7 @@ const ControlPanel: React.FC = () => {
                 const node = nodeLookup.get(id);
                 const name = node?.display_name || node?.name || id.slice(0, 8);
                 const nameSource = node?.name_source || node?.data_source || "synthetic";
-                const dataQuality = node?.data_quality || "verified";
+                const dataQuality = node?.data_quality || "estimated";
                 return (
                   <span
                     key={id}
