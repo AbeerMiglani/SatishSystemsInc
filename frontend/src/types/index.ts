@@ -64,7 +64,12 @@ export interface Network {
 // ---------------------------------------------------------------------------
 export interface CascadeWave {
   wave: number;
+  simulated_minute?: number;
   failed_node_ids: string[];
+  cumulative_failed_count?: number;
+  population_affected_estimate?: number;
+  hospital_count_operational?: number;
+  hospital_count_failed?: number;
 }
 
 export interface SimulationResult {

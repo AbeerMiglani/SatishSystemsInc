@@ -164,8 +164,15 @@ def calculate_pagerank_gds(network_id: str) -> list[dict[str, Any]]:
         try:
             node_query = "MATCH (n:Asset {network_id: $network_id}) RETURN id(n) AS id"
             rel_query = """
-            MATCH (s:Asset {network_id: $network_id})-[r]->(t:Asset {network_id: $network_id})
-            RETURN id(s) AS source, id(t) AS target
+            MATCH (a:Asset {network_id: $network_id})-[r]-(b:Asset {network_id: $network_id})
+            WHERE id(a) < id(b)
+            WITH id(a) AS source, id(b) AS target, coalesce(r.weight, 1.0) AS weight
+            RETURN source, target, weight
+            UNION
+            MATCH (a:Asset {network_id: $network_id})-[r]-(b:Asset {network_id: $network_id})
+            WHERE id(a) < id(b)
+            WITH id(a) AS source, id(b) AS target, coalesce(r.weight, 1.0) AS weight
+            RETURN target AS source, source AS target, weight
             """
 
             session.run(
@@ -324,3 +331,32 @@ def calculate_centrality(
             logger.warning("centrality cache write failed", exc_info=True)
 
     return ranked_results
+
+
+def calculate_networkx_centrality(
+    nodes: list[Any], edges: list[Any], metric: str = "betweenness"
+) -> list[dict[str, Any]]:
+    """Deterministic fallback when Neo4j/GDS is unavailable."""
+    graph = nx.Graph()
+    graph.add_nodes_from(str(node.id) for node in nodes)
+    for edge in edges:
+        graph.add_edge(str(edge.source_id), str(edge.target_id), weight=edge.weight)
+    if metric == "betweenness":
+        scores = nx.betweenness_centrality(graph, weight="weight", normalized=True)
+    elif metric == "pagerank":
+        scores = nx.pagerank(graph, weight="weight")
+    else:
+        raise ValueError("unsupported centrality metric")
+    names = {str(node.id): node.display_name for node in nodes}
+    return [
+        {
+            "node_id": node_id,
+            "display_name": names.get(node_id),
+            "metric": metric,
+            "score": score,
+            "rank": rank,
+        }
+        for rank, (node_id, score) in enumerate(
+            sorted(scores.items(), key=lambda item: (-item[1], item[0])), start=1
+        )
+    ]

@@ -105,6 +105,8 @@ def run_simulation_task(
                 current_load=n.current_load, 
                 failure_threshold=n.failure_threshold,
                 population_served=n.population_served,
+                population_zone_id=n.population_zone_id,
+                node_type=n.node_type,
                 status=n.status,
             )
             
@@ -130,7 +132,7 @@ def run_simulation_task(
             get_redis_client().publish(f"sim_{simulation_id}", json.dumps(wave_data))
 
         # 4. Run cascade engine
-        waves, eff_before, eff_after, pop_affected = run_cascade(
+        waves, eff_before, eff_after, _pop_affected = run_cascade(
             G, 
             initial_failures, 
             on_wave_completed=on_wave
@@ -144,8 +146,9 @@ def run_simulation_task(
 
         # 6. Save results to Postgres
         total_failed = sum(len(w['failed_node_ids']) for w in waves)
+        population_affected = calculate_population_impact(cumulative_failed_ids, G)
         
-        sim.waves = waves
+        sim.waves = enriched_waves
         sim.total_failed = total_failed
         sim.population_affected_estimate = pop_impact["population_affected_estimate"]
         sim.study_area_population_cap = pop_impact["study_area_population_cap"]

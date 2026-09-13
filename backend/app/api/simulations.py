@@ -14,6 +14,7 @@ from app.models.network import Network, Node, Scenario, SimulationResult
 from app.security import enforce_rate_limit, require_operator, require_viewer
 from app.services.recommendations import MitigationRecommendation, get_recommendations
 from app.simulation.runner import run_simulation_task
+from app.services.recommendations import recommend_interventions
 
 router = APIRouter(
     prefix="/simulations",
@@ -112,6 +113,29 @@ def create_simulation(
         raise HTTPException(status_code=503, detail="Simulation queue unavailable")
     
     return sim
+
+
+@router.get("/{sim_id}/recommendations")
+def get_recommendations(sim_id: uuid.UUID, db: Session = Depends(get_db)):
+    sim = db.query(SimulationResult).filter(SimulationResult.id == sim_id).first()
+    if not sim:
+        raise HTTPException(status_code=404, detail="Simulation not found")
+    if sim.status != "completed":
+        raise HTTPException(status_code=400, detail="Recommendations require a completed simulation")
+    nodes = db.query(Node).filter(Node.network_id == sim.network_id).all()
+    edges = db.query(Edge).filter(Edge.network_id == sim.network_id).all()
+    scenario = (
+        db.query(Scenario)
+        .filter(Scenario.cached_result_id == sim.id, Scenario.network_id == sim.network_id)
+        .first()
+    )
+    recommendations = recommend_interventions(
+        sim,
+        nodes,
+        edges,
+        scenario_modifications=scenario.modifications if scenario else None,
+    )
+    return {"simulation_id": sim.id, "recommendations": recommendations}
 
 
 @router.get("/{sim_id}", response_model=SimulationResponse)

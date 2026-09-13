@@ -32,7 +32,7 @@ const ControlPanel: React.FC = () => {
 
   useEffect(() => {
     if (polledResult && polledResult.status === "completed") {
-      if (!result || result.id !== polledResult.id) {
+      if (!dismissedSimulationIds.has(polledResult.id) && (!result || result.id !== polledResult.id)) {
         setSimulationResult(polledResult);
       }
       try {
@@ -49,7 +49,7 @@ const ControlPanel: React.FC = () => {
         }
       } catch {}
     }
-  }, [polledResult, result, setSimulationResult]);
+  }, [polledResult, result, dismissedSimulationIds, setSimulationResult]);
 
   const handleRunBaseline = () => {
     if (!networkId || selectedNodeIds.size === 0) return;
@@ -103,6 +103,38 @@ const ControlPanel: React.FC = () => {
       console.error(e);
       alert("Failed to create scenario: " + e);
     }
+  };
+
+  const handleApplyRecommendation = async (payload: Modification) => {
+    if (!result || result.status !== "completed") return;
+    try {
+      const scenario = await createScenarioMutation.mutateAsync({
+        network_id: result.network_id,
+        name: "Recommended capacity upgrade",
+        description: "Verified recommendation applied as an upgrade scenario.",
+        modifications: [payload],
+        initial_failures: result.initial_failures,
+      });
+      simMutation.mutate({
+        network_id: result.network_id,
+        initial_failures: result.initial_failures,
+        scenario_id: scenario.id,
+      });
+    } catch (error) {
+      console.error(error);
+      alert(`Failed to apply recommendation: ${(error as Error).message}`);
+    }
+  };
+
+  const handleResetTimeline = () => {
+    if (result?.status === "completed") {
+      setDismissedSimulationIds((prev) => {
+        const next = new Set(prev);
+        next.add(result.id);
+        return next;
+      });
+    }
+    reset();
   };
 
   const isRunning = simMutation.isPending || (polledResult && polledResult.status !== "completed" && polledResult.status !== "failed");
@@ -328,26 +360,19 @@ const ControlPanel: React.FC = () => {
       )}
 
       {result && result.waves.length > 0 && (
-        <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <span style={{ fontSize: 14 }}>Wave: {currentWave} / {result.waves.length - 1}</span>
-          </div>
-          <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-            <button
-              onClick={isPlaying ? pause : play}
-              style={{ flex: 1, padding: "6px", background: "#3b82f6", color: "white", border: "none", borderRadius: 4, cursor: "pointer" }}
-            >
-              {isPlaying ? "Pause" : "Play Animation"}
-            </button>
-            <button
-              onClick={reset}
-              style={{ padding: "6px 12px", background: "#334155", color: "white", border: "none", borderRadius: 4, cursor: "pointer" }}
-            >
-              Reset
-            </button>
-          </div>
-        </div>
+        <CascadeTimeline
+          waves={result.waves}
+          currentWave={currentWave}
+          isPlaying={isPlaying}
+          onPlayPause={isPlaying ? pause : play}
+          onReset={handleResetTimeline}
+          onWaveChange={setWave}
+        />
       )}
+      <RecommendationPanel
+        simulationId={result?.status === "completed" ? result.id : null}
+        onApply={handleApplyRecommendation}
+      />
     </div>
   );
 };

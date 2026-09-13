@@ -106,9 +106,17 @@ def ingest_seed_data(db: Session, force: bool = False) -> str:
         clear_network_from_neo4j(replaced_network_id)
     sync_network_to_neo4j(db, str(net_id))
     try:
-        get_redis_client().delete(f"centrality:{net_id}")
+        get_redis_client().delete(
+            f"centrality:betweenness:{net_id}",
+            f"centrality:pagerank:{net_id}",
+            f"centrality:{net_id}",
+        )
         if replaced_network_id:
-            get_redis_client().delete(f"centrality:{replaced_network_id}")
+            get_redis_client().delete(
+                f"centrality:betweenness:{replaced_network_id}",
+                f"centrality:pagerank:{replaced_network_id}",
+                f"centrality:{replaced_network_id}",
+            )
     except Exception:
         logger.warning("could not invalidate centrality cache for %s", net_id, exc_info=True)
 

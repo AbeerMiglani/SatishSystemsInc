@@ -58,6 +58,9 @@ class Node(Base):
         PG_UUID(as_uuid=True), ForeignKey("networks.id", ondelete="CASCADE"), nullable=False, index=True
     )
     name = Column(String, nullable=False)
+    display_name_value = Column(String, nullable=True)
+    name_source = Column(String, nullable=False, default="synthetic")
+    data_quality = Column(String, nullable=False, default="estimated")
     node_type = Column(
         Enum(
             "power_substation",
@@ -78,6 +81,7 @@ class Node(Base):
     current_load = Column(Float, nullable=False, default=0.0)
     failure_threshold = Column(Float, nullable=False, default=1.0)
     population_served = Column(Integer, nullable=False, default=0)
+    population_zone_id = Column(String, nullable=True)
     status = Column(
         Enum("operational", "degraded", "failed", name="node_status_enum"),
         default="operational",
@@ -105,6 +109,11 @@ class Node(Base):
     # Relationships for edges where this node is source/target
     edges_out = relationship("Edge", foreign_keys="Edge.source_id", back_populates="source")
     edges_in = relationship("Edge", foreign_keys="Edge.target_id", back_populates="target")
+
+    @property
+    def display_name(self) -> str:
+        """Stable human-readable label; UUID remains the canonical identifier."""
+        return self.display_name_value or self.name
 
 
 class Edge(Base):
