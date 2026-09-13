@@ -121,7 +121,7 @@ const CriticalityPanel: React.FC = () => {
             nodeObj?.name ||
             s.node_id.slice(0, 8);
           const nameSource = s.name_source || nodeObj?.name_source || s.data_source || "synthetic";
-          const dataQuality = s.data_quality || nodeObj?.data_quality || "verified";
+          const dataQuality = s.data_quality || nodeObj?.data_quality || "estimated";
 
           return (
             <div

@@ -232,7 +232,7 @@ export default function MapView({ nodes, edges }: MapViewProps) {
                 ID: ${object.id}
               </div>
               ${object.population_served ? `<div style="font-size: 11px; color: #cbd5e1; margin-top: 2px;">Pop Served: ${object.population_served.toLocaleString()}</div>` : ""}
-              <div style="font-size: 10px; color: #a7f3d0; margin-top: 2px;">Source: ${object.name_source || object.data_source || "synthetic"} | Quality: ${object.data_quality || "verified"}</div>
+              <div style="font-size: 10px; color: #a7f3d0; margin-top: 2px;">Source: ${object.name_source || object.data_source || "synthetic"} | Quality: ${object.data_quality || "estimated"}</div>
             </div>
           `,
           style: {
