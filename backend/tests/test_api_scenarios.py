@@ -190,6 +190,11 @@ if _need_mock("geoalchemy2"):
     mock_geo.Geometry = MagicMock()
 
 if "app.db.postgres" not in sys.modules:
+    if "MockBase" not in globals():
+        from sqlalchemy.orm import DeclarativeBase
+
+        class MockBase(DeclarativeBase):
+            pass
     mock_app_db_pg = _make_mock_module("app.db.postgres")
     mock_app_db_pg.Base = MockBase
     mock_app_db_pg.engine = MagicMock()
