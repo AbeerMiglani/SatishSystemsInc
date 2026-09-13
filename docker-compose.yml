@@ -131,6 +131,23 @@ services:
         condition: service_healthy
       migrator:
         condition: service_completed_successfully
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ripple-frontend
+    # Gated behind the "demo" profile so that a plain `docker compose up --build`
+    # is unchanged and port 5173 stays free for the host-based `npm run dev`
+    # workflow documented in the README. `./demo up` enables the profile.
+    profiles:
+    - demo
+    ports:
+    - 5173:5173
+    environment:
+      # Inside the container the API is the `backend` service, not localhost.
+      VITE_API_TARGET: http://backend:8000
+    depends_on:
+    - backend
 volumes:
   pgdata: null
   neo4jdata: null

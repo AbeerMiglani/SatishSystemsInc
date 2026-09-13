@@ -83,6 +83,62 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ---
 
+## Quick Demo (one command)
+
+**Prerequisites:** Git and [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+with Docker Compose v2. Nothing else — no Node, Python, or `curl` needed on this path.
+
+```bash
+./demo up
+```
+
+Then open **[http://localhost:5173](http://localhost:5173)**.
+
+`./demo up` builds the images, starts Postgres, Neo4j, Redis, the API and the
+Celery worker, applies the Alembic migrations, ingests the checked-in seed
+network, and waits for each of those to actually report ready before printing
+the URL. It waits on real health signals rather than fixed delays, and it is
+safe to re-run — seed ingestion is idempotent and never rewrites `data/seed`.
+Neo4j's first start is the slow part (heap allocation plus the
+graph-data-science plugin), so allow a minute on a cold run.
+
+| Command | What it does |
+|---------|--------------|
+| `./demo up` | Start everything and verify it is ready. |
+| `./demo status` | Re-check readiness and print the URLs. Exits non-zero if the demo is not usable. Changes nothing. |
+| `./demo logs [service...]` | Follow logs, e.g. `./demo logs backend`. |
+| `./demo test` | Run the deterministic cascade + intervention walkthrough (`data/scripts/demo_scenario.py`) inside the backend container. |
+| `./demo down` | Stop the containers. **Data is preserved** — the next `./demo up` is fast. |
+| `./demo reset [-y]` | **Destructive.** Delete the local Postgres, Neo4j and Redis Docker volumes, then bring everything back up clean. Prompts for confirmation; `-y` for non-interactive use. |
+
+Run `./demo help` for the full usage text and the `DEMO_*_TIMEOUT` environment
+variables that adjust the readiness budgets on a slow machine.
+
+**Credentials.** The first run copies `.env.example` to `.env` if you do not
+already have one; an existing `.env` is never modified. Those values —
+`ripple` / `ripple_dev` for Postgres and `neo4j` / `ripple_dev_neo4j` for the
+[Neo4j Browser](http://localhost:7474) — are **development and demo credentials
+only, intended for a local machine and never for a deployment**. `.env` is
+git-ignored and stays on your machine.
+
+**Windows.** Run `./demo` from Git Bash or WSL.
+
+The manual workflow in [Quick Start](#quick-start) above still works exactly as
+documented: the containerised frontend sits behind the Compose `demo` profile,
+so a plain `docker compose up --build` starts the same six services as before
+and leaves port 5173 free for `npm run dev`. For broader host-side integration
+assertions, `python e2e_test.py` remains available to anyone with Python
+installed.
+
+> **Note on verification:** the `./demo` runner's own logic is covered by
+> offline tests (`backend/tests/test_demo_runner.py`) and its Compose wiring is
+> validated with `docker compose config`, but a full live-stack run of
+> `./demo up` has **not** been verified in the restricted environment this was
+> developed in, where Docker image-layer downloads are blocked. Please report
+> anything that behaves differently on a machine with normal registry access.
+
+---
+
 ## Architecture
 
 ```text
