@@ -173,7 +173,7 @@ def resimulate_candidate(
     if node_id in G_cand.nodes:
         G_cand.nodes[node_id]["capacity"] = float(proposed_capacity)
 
-    waves_c, _, eff_after_c, raw_pop_c = run_cascade(G_cand, initial_failures)
+    waves_c, _, eff_after_c, raw_pop_c, _ = run_cascade(G_cand, initial_failures)
     cand_failed_count = sum(len(w.get("failed_node_ids", [])) for w in waves_c)
 
     failures_prevented = baseline_failed_count - cand_failed_count
@@ -341,7 +341,7 @@ def get_recommendations(
                 G_cand = G_baseline.copy()
                 G_cand.add_edge(src_id, succ, weight=weight, capacity=capacity, edge_type=edge_type)
 
-                waves_c, _, eff_after_c, raw_pop_c = run_cascade(G_cand, initial_failures)
+                waves_c, _, eff_after_c, raw_pop_c, _ = run_cascade(G_cand, initial_failures)
                 cand_failed_count = sum(len(w.get("failed_node_ids", [])) for w in waves_c)
 
                 failures_prevented = baseline_failed_count - cand_failed_count

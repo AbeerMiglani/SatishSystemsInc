@@ -87,7 +87,11 @@ class Node(Base):
     data_source = Column(String, nullable=False, default="synthetic", server_default="synthetic")
     display_name = Column(String, nullable=False)
     name_source = Column(String, nullable=False, default="synthetic", server_default="synthetic")
-    data_quality = Column(String, nullable=False, default="verified", server_default="verified")
+    # Defaults to "estimated", not "verified": the shipped dataset is synthetic,
+    # and this value is rendered to the user in the map tooltip, the criticality
+    # panel and the selection chips. Only genuinely observed data may claim
+    # "verified" (see data/seed/README.md for the provenance vocabulary).
+    data_quality = Column(String, nullable=False, default="estimated", server_default="estimated")
 
     @validates("name")
     def sync_display_name_from_name(self, key, value):
@@ -178,9 +182,17 @@ class SimulationResult(Base):
     
     total_failed = Column(Integer, nullable=False, default=0)
     population_affected_estimate = Column(Integer, nullable=False, default=0)
+    # Uncapped sum. Kept alongside the capped estimate so a before/after
+    # comparison stays meaningful when both runs saturate the study-area cap.
+    # Nullable because rows written before this column existed have no recorded
+    # raw value, and back-filling one would misrepresent those runs.
+    raw_population_affected = Column(Integer, nullable=True)
     study_area_population_cap = Column(Integer, nullable=False, default=65000, server_default="65000")
     is_population_capped = Column(Boolean, nullable=False, default=False, server_default="false")
     has_unresolved_overlap = Column(Boolean, nullable=False, default=False, server_default="false")
+    # False when the cascade was truncated at the wave guardrail rather than
+    # reaching a fixed point. A truncated run is still a valid bounded result.
+    cascade_stabilized = Column(Boolean, nullable=False, default=True, server_default="true")
     global_efficiency_before = Column(Float, nullable=True)
     global_efficiency_after = Column(Float, nullable=True)
     

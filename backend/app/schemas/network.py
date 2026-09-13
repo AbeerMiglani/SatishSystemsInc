@@ -22,7 +22,7 @@ class NodeBase(BaseModel):
     is_synthetic: bool = True
     data_source: str = "synthetic"
     name_source: str = "synthetic"
-    data_quality: str = "verified"
+    data_quality: str = "estimated"
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -62,7 +62,7 @@ class CentralityScore(BaseModel):
     is_synthetic: bool = True
     data_source: str = "synthetic"
     name_source: str = "synthetic"
-    data_quality: str = "verified"
+    data_quality: str = "estimated"
     score: float
     rank: int
 

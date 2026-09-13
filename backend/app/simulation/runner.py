@@ -13,6 +13,7 @@ import networkx as nx
 from celery import shared_task
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.db.postgres import SessionLocal
 from app.db.redis import get_redis_client
 from app.models.network import Edge, Node, Scenario, SimulationResult
@@ -130,9 +131,10 @@ def run_simulation_task(
             get_redis_client().publish(f"sim_{simulation_id}", json.dumps(wave_data))
 
         # 4. Run cascade engine
-        waves, eff_before, eff_after, pop_affected = run_cascade(
-            G, 
-            initial_failures, 
+        waves, eff_before, eff_after, pop_affected, stabilized = run_cascade(
+            G,
+            initial_failures,
+            max_waves=settings.max_cascade_waves,
             on_wave_completed=on_wave
         )
         
@@ -148,9 +150,14 @@ def run_simulation_task(
         sim.waves = waves
         sim.total_failed = total_failed
         sim.population_affected_estimate = pop_impact["population_affected_estimate"]
+        # Persist the uncapped total too: when both a baseline and an
+        # intervention saturate the study-area cap, the capped figure is
+        # identical for each and a real improvement would be invisible.
+        sim.raw_population_affected = pop_impact["raw_population_affected"]
         sim.study_area_population_cap = pop_impact["study_area_population_cap"]
         sim.is_population_capped = pop_impact["is_population_capped"]
         sim.has_unresolved_overlap = pop_impact["has_unresolved_overlap"]
+        sim.cascade_stabilized = stabilized
         sim.global_efficiency_before = eff_before
         sim.global_efficiency_after = eff_after
         sim.status = "completed"

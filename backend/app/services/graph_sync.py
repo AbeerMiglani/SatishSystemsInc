@@ -52,7 +52,7 @@ def sync_network_to_neo4j(db: Session, network_id: str):
             "is_synthetic": getattr(n, "is_synthetic", True),
             "data_source": getattr(n, "data_source", "synthetic"),
             "name_source": getattr(n, "name_source", "synthetic") or "synthetic",
-            "data_quality": getattr(n, "data_quality", "verified") or "verified",
+            "data_quality": getattr(n, "data_quality", "estimated") or "estimated",
         }
         for n in nodes
     ]

@@ -260,7 +260,7 @@ def test_clear_winner_ranks_first():
     G.add_edge(node_c, node_h, weight=1.0, capacity=100.0, edge_type="power_supply")
 
     # Run baseline cascade
-    waves, _, eff_a, _ = run_cascade(G, [node_a])
+    waves, _, eff_a, _, _ = run_cascade(G, [node_a])
     total_failed = sum(len(w["failed_node_ids"]) for w in waves)
     assert total_failed == 8  # A, B, C, D, E, F, G, H all fail
 
@@ -308,7 +308,7 @@ def test_empty_wave_one_returns_empty():
     _make_node(G, node_b, "Node B", capacity=100.0, current_load=5.0)  # High capacity absorbs load
     G.add_edge(node_a, node_b, weight=1.0, capacity=100.0, edge_type="power_supply")
 
-    waves, _, eff_a, _ = run_cascade(G, [node_a])
+    waves, _, eff_a, _, _ = run_cascade(G, [node_a])
     total_failed = sum(len(w["failed_node_ids"]) for w in waves)
     assert total_failed == 1
     assert len(waves) == 1
@@ -347,7 +347,7 @@ def test_no_improvement_candidates_excluded():
     G.add_edge(node_a, node_b, weight=1.0, capacity=5000.0, edge_type="power_supply")
     G.add_edge(node_b, node_c, weight=1.0, capacity=5000.0, edge_type="power_supply")
 
-    waves, _, eff_a, _ = run_cascade(G, [node_a])
+    waves, _, eff_a, _, _ = run_cascade(G, [node_a])
     assert len(waves) > 1
 
     sim = SimulationResult(
@@ -383,7 +383,7 @@ def test_self_exclusion_initial_failures_omitted():
     G.add_edge(node_a, node_b, weight=1.0, capacity=100.0, edge_type="power_supply")
     G.add_edge(node_b, node_c, weight=1.0, capacity=100.0, edge_type="power_supply")
 
-    waves, _, eff_a, _ = run_cascade(G, [node_a])
+    waves, _, eff_a, _, _ = run_cascade(G, [node_a])
 
     # 1. Candidate identification function level
     candidate_ids = identify_candidate_nodes(G, waves, [node_a])
@@ -451,7 +451,7 @@ def test_protects_critical_services_hospital_priority():
 
     # Baseline cascade: A fails, sends 10 to B and 10 to C. Both B and C overload and fail.
     # Then B sends to H (fails), C sends to P (fails). All 5 nodes fail.
-    waves, _, eff_a, _ = run_cascade(G, [node_a])
+    waves, _, eff_a, _, _ = run_cascade(G, [node_a])
     assert len(waves) > 1
     total_failed = sum(len(w["failed_node_ids"]) for w in waves)
     assert total_failed == 5
@@ -517,7 +517,7 @@ def test_add_edge_redundancy_candidate_generated():
     # Baseline cascade: A fails (wave 0), sends 15 to B. B fails (wave 1, load 20 > 10).
     # B sends 20 to C. C absorbs 20 (load 25 <= 200) and SURVIVES.
     # C is now isolated from S and T.
-    waves, _, eff_a, _ = run_cascade(G, [node_a])
+    waves, _, eff_a, _, _ = run_cascade(G, [node_a])
     assert len(waves) == 2  # Wave 0 (A), Wave 1 (B)
     total_failed = sum(len(w["failed_node_ids"]) for w in waves)
     assert total_failed == 2

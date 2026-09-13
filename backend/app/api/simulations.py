@@ -49,6 +49,15 @@ class SimulationResponse(BaseModel):
     waves: list[WaveSchema]
     total_failed: int
     population_affected_estimate: int
+    # Population provenance must reach the client: without these the UI cannot
+    # tell the user that a figure was capped, nor show a meaningful before/after
+    # when both runs saturate the cap. raw_population_affected is optional
+    # because rows predating the column have no recorded raw value.
+    raw_population_affected: int | None = None
+    study_area_population_cap: int = 65_000
+    is_population_capped: bool = False
+    has_unresolved_overlap: bool = False
+    cascade_stabilized: bool = True
     global_efficiency_before: float | None = None
     global_efficiency_after: float | None = None
     error_message: str | None = None

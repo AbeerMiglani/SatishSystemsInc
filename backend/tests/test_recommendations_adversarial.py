@@ -80,7 +80,7 @@ def test_single_node_graph_returns_empty_list():
     node_a = str(uuid.uuid4())
     _make_node(G, node_a, "Solo Substation", capacity=50.0, current_load=10.0)
 
-    waves, _, eff_a, _ = run_cascade(G, [node_a])
+    waves, _, eff_a, _, _ = run_cascade(G, [node_a])
     assert len(waves) == 1
     total_failed = sum(len(w["failed_node_ids"]) for w in waves)
     assert total_failed == 1
@@ -124,7 +124,7 @@ def test_fully_connected_graph_edge_cases_and_candidate_properties():
                 G.add_edge(u, v, weight=1.0, capacity=30.0, edge_type="power_supply")
 
     # Baseline cascade: Node 0 fails, redistributing load across nodes 1..4
-    waves, _, eff_a, _ = run_cascade(G, [nodes[0]])
+    waves, _, eff_a, _, _ = run_cascade(G, [nodes[0]])
     total_failed = sum(len(w["failed_node_ids"]) for w in waves)
     assert total_failed > 1, f"Expected cascade to propagate in clique, got total_failed={total_failed}"
 
@@ -181,7 +181,7 @@ def test_zero_capacity_zero_load_numeric_stability():
     G.add_edge(node_a, node_b, weight=1.0, capacity=100.0, edge_type="power_supply")
     G.add_edge(node_b, node_c, weight=1.0, capacity=100.0, edge_type="power_supply")
 
-    waves, _, eff_a, _ = run_cascade(G, [node_a])
+    waves, _, eff_a, _, _ = run_cascade(G, [node_a])
 
     sim = SimulationResult(
         id=uuid.uuid4(),

@@ -19,6 +19,9 @@ SEED_DIR = Path("/data/seed")
 if not SEED_DIR.exists():
     SEED_DIR = Path(__file__).resolve().parents[3] / "data" / "seed"
 SEED_NETWORK_NAME = "Manipal Demo Network"
+#: Metrics supported by app.services.analytics.calculate_centrality. Each is
+#: cached under its own key, so all of them must be invalidated on re-seed.
+CENTRALITY_CACHE_METRICS = ("betweenness", "pagerank")
 logger = logging.getLogger(__name__)
 
 
@@ -77,7 +80,7 @@ def ingest_seed_data(db: Session, force: bool = False) -> str:
                     is_synthetic=props.get("is_synthetic", True),
                     data_source=props.get("data_source", "synthetic"),
                     name_source=props.get("name_source", "synthetic"),
-                    data_quality=props.get("data_quality", "verified"),
+                    data_quality=props.get("data_quality", "estimated"),
                 )
             )
         db.add_all(node_objects)
@@ -106,9 +109,16 @@ def ingest_seed_data(db: Session, force: bool = False) -> str:
         clear_network_from_neo4j(replaced_network_id)
     sync_network_to_neo4j(db, str(net_id))
     try:
-        get_redis_client().delete(f"centrality:{net_id}")
+        # Cache keys are "centrality:{id}:{metric}", so each metric must be
+        # dropped explicitly; the old unsuffixed delete matched nothing and left
+        # stale scores referencing node IDs that no longer exist after a re-seed.
+        stale_keys = [f"centrality:{net_id}:{metric}" for metric in CENTRALITY_CACHE_METRICS]
         if replaced_network_id:
-            get_redis_client().delete(f"centrality:{replaced_network_id}")
+            stale_keys += [
+                f"centrality:{replaced_network_id}:{metric}"
+                for metric in CENTRALITY_CACHE_METRICS
+            ]
+        get_redis_client().delete(*stale_keys)
     except Exception:
         logger.warning("could not invalidate centrality cache for %s", net_id, exc_info=True)
 

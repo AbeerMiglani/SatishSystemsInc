@@ -42,7 +42,7 @@ def test_motter_lai_uniform_cascade():
     G.add_edge("A", "B")
     G.add_edge("B", "C")
     
-    waves, _eff_b, eff_a, pop = run_cascade(G, ["A"])
+    waves, _eff_b, eff_a, pop, _ = run_cascade(G, ["A"])
     
     assert len(waves) == 3
     assert set(waves[0]["failed_node_ids"]) == {"A"}
@@ -61,7 +61,7 @@ def test_zero_neighbor_noop():
     G.add_node("A", current_load=100.0, capacity=150.0)
     G.add_node("B", current_load=100.0, capacity=150.0) # B is isolated
     
-    waves, _, _, _ = run_cascade(G, ["A"])
+    waves, _, _, _, _ = run_cascade(G, ["A"])
     assert len(waves) == 1
     assert set(waves[0]["failed_node_ids"]) == {"A"}
     
@@ -82,12 +82,12 @@ def test_directed_redistribution():
     G.add_edge("B", "C")
     
     # Failing A shouldn't affect B
-    waves_a, _, _, _ = run_cascade(G, ["A"])
+    waves_a, _, _, _, _ = run_cascade(G, ["A"])
     assert len(waves_a) == 1
     
     # Failing B distributes 10/2 = 5 to A and C. 
     # Current capacities are 10, so they don't fail.
-    waves_b, _, _, _ = run_cascade(G, ["B"])
+    waves_b, _, _, _, _ = run_cascade(G, ["B"])
     assert len(waves_b) == 1  # Only B fails
 
 
@@ -117,7 +117,7 @@ def test_far_node_survives_cascade():
     G.nodes["2"]["capacity"] = 9999.0
     
     # Fail Node 0
-    waves, _, _, _ = run_cascade(G, ["0"])
+    waves, _, _, _, _ = run_cascade(G, ["0"])
     
     # Wave 0: "0" fails, sends 10 load to "1"
     # "1" new load = 10 + 10 = 20 > capacity (15) => "1" fails in Wave 1
@@ -134,3 +134,44 @@ def test_far_node_survives_cascade():
     for i in range(2, 10):
         assert str(i) not in all_failed
 
+
+def test_cascade_stabilizes_flag_true_when_settled():
+    """A cascade that reaches a fixed point reports stabilized=True."""
+    G = nx.DiGraph()
+    G.add_node("A", current_load=10.0, capacity=15.0, failure_threshold=1.0)
+    G.add_node("B", current_load=0.0, capacity=9999.0, failure_threshold=1.0)
+    G.add_edge("A", "B")
+
+    waves, _, _, _, stabilized = run_cascade(G, ["A"])
+
+    assert stabilized is True
+    assert len(waves) == 1
+
+
+def test_cascade_truncates_instead_of_raising_at_max_waves():
+    """
+    Hitting the wave guardrail must return a valid bounded result, not destroy
+    the run. Previously this raised RuntimeError, which the Celery task turned
+    into a 'failed' simulation and an opaque error for the user.
+
+    Chain of brittle nodes: every wave topples exactly one more node, so a
+    max_waves below the chain length is guaranteed to truncate mid-cascade.
+    """
+    G = nx.DiGraph()
+    for i in range(10):
+        G.add_node(str(i), current_load=10.0, capacity=15.0, failure_threshold=1.0)
+        if i > 0:
+            G.add_edge(str(i - 1), str(i))
+
+    waves, eff_before, eff_after, pop, stabilized = run_cascade(G, ["0"], max_waves=3)
+
+    # Bounded, valid, and honestly labelled as unsettled.
+    assert stabilized is False
+    assert len(waves) == 3
+    assert all("failed_node_ids" in w for w in waves)
+    assert isinstance(eff_before, float) and isinstance(eff_after, float)
+    assert isinstance(pop, int)
+
+    # The same scenario with room to run settles and reports it.
+    _, _, _, _, stabilized_full = run_cascade(G, ["0"], max_waves=50)
+    assert stabilized_full is True

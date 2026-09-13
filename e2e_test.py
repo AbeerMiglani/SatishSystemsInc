@@ -5,7 +5,7 @@ Ripple E2E Test Suite — Single Comprehensive Verification Loop (Requirement R2
 Exercises the complete resilience workflow:
 1. Discovers and reuses an existing network via GET /api/networks.
 2. Asserts Betweenness Centrality is returned by default for network centrality queries.
-3. Triggers a baseline simulation with a genuine cascading failure (Grid Substation PS-02).
+3. Selects a seed node whose cascade consequence is verified by simulation (no hardcoded IDs).
    Polls until status is completed and asserts multi-wave cascade occurred.
 4. Calls the recommendations endpoint and asserts at least one candidate with verified: True.
 5. Creates a scenario using the verified candidate's scenario_payload and runs its simulation.
@@ -24,6 +24,9 @@ from typing import Any
 
 BASE_URL = "http://localhost:8000/api"
 TIMEOUT_SECS = 30
+#: Bounded number of candidate seed nodes to simulate while looking for one
+#: whose failure genuinely cascades.
+MAX_SEED_PROBES = 8
 
 
 def request(url: str, method: str = "GET", data: dict[str, Any] | None = None) -> Any:
@@ -33,6 +36,65 @@ def request(url: str, method: str = "GET", data: dict[str, Any] | None = None) -
         req.data = json.dumps(data).encode("utf-8")
     with urllib.request.urlopen(req) as response:
         return json.loads(response.read().decode("utf-8"))
+
+
+def comparable_population(sim: dict[str, Any]) -> int:
+    """Population figure that remains comparable across runs.
+
+    ``population_affected_estimate`` is capped at the study-area limit. When a
+    baseline and an intervention both exceed that cap they report the same
+    number, so asserting a strict decrease on it fails even when the
+    intervention genuinely protected tens of thousands of people. The uncapped
+    total is used instead where the API provides it.
+    """
+    raw = sim.get("raw_population_affected")
+    return sim.get("population_affected_estimate", 0) if raw is None else raw
+
+
+def select_cascading_seed_node(
+    network_id: str,
+    nodes: list[dict[str, Any]],
+    centrality: list[dict[str, Any]],
+    max_probes: int = MAX_SEED_PROBES,
+) -> tuple[str, str, dict[str, Any]]:
+    """Find a seed node whose failure produces a real multi-wave cascade.
+
+    This test previously hardcoded a node name plus a literal UUID fallback,
+    which silently targeted a stale ID whenever the seed data was regenerated
+    (node IDs are not stable across regeneration). Instead, walk candidates in
+    centrality order and simulate each until one actually cascades. The winning
+    simulation is returned so it doubles as the baseline.
+    """
+    names = {n["id"]: (n.get("display_name") or n.get("name") or n["id"][:8]) for n in nodes}
+    ranked = [c["node_id"] for c in sorted(centrality, key=lambda x: x.get("rank", 9999))]
+    # Fall back to plain node order if centrality gave us nothing usable.
+    candidates = [nid for nid in ranked if nid in names] or [n["id"] for n in nodes]
+
+    attempts: list[str] = []
+    for node_id in candidates[:max_probes]:
+        label = names.get(node_id, node_id[:8])
+        sim = poll_simulation(
+            request(
+                f"{BASE_URL}/simulations",
+                method="POST",
+                data={"network_id": network_id, "initial_failures": [node_id]},
+            )["id"]
+        )
+        waves = len(sim.get("waves", []))
+        failed = sim.get("total_failed", 0)
+        attempts.append(f"{label}: {failed} failed / {waves} wave(s)")
+
+        if sim.get("status") == "completed" and waves > 1 and failed > 1:
+            print(f"  ✓ Verified cascade on {label}: {failed} failed across {waves} waves")
+            return node_id, label, sim
+
+        print(f"    {label}: no cascade ({failed} failed, {waves} wave) — next candidate")
+
+    raise AssertionError(
+        "No cascading seed node found in the top "
+        f"{max_probes} candidates. Probed:\n      " + "\n      ".join(attempts) + "\n"
+        "  The E2E loop requires a failure that actually displaces load."
+    )
 
 
 def poll_simulation(sim_id: str, timeout_secs: int = TIMEOUT_SECS) -> dict[str, Any]:
@@ -91,30 +153,23 @@ def main() -> int:
     print(f"  ✓ Centrality verified: Betweenness is default (Top node: {top_cent_name}, score={top_cent_score:.4f})")
 
     # -------------------------------------------------------------------------
-    # 3. Trigger baseline simulation with genuine failure (PS-02)
+    # 3. Select a seed node by verified cascade consequence
     # -------------------------------------------------------------------------
-    print("\n[Step 3/6] Identifying reliable cascade seed node and running baseline simulation...")
+    print("\n[Step 3/6] Selecting a cascading seed node by verified consequence...")
     nodes = request(f"{BASE_URL}/networks/{network_id}/nodes")
-    ps02_candidates = [
-        n for n in nodes
-        if "PS-02" in n.get("name", "") or "PS-02" in n.get("display_name", "") or "Substation 2" in n.get("name", "")
-    ]
-    seed_node_id = ps02_candidates[0]["id"] if ps02_candidates else "f0be4cd9-4156-4b19-b08f-60e275a55c96"
-    seed_node_name = ps02_candidates[0]["name"] if ps02_candidates else "Grid Substation PS-02"
+    assert nodes, "Network returned no nodes."
+
+    seed_node_id, seed_node_name, base_sim = select_cascading_seed_node(
+        network_id, nodes, default_cent
+    )
+    base_sim_id = base_sim["id"]
 
     print(f"  Target seed node: {seed_node_name} ({seed_node_id})")
-    base_sim = request(f"{BASE_URL}/simulations", method="POST", data={
-        "network_id": network_id,
-        "initial_failures": [seed_node_id],
-    })
-    base_sim_id = base_sim["id"]
-    base_sim = poll_simulation(base_sim_id)
-
     assert base_sim["status"] == "completed", (
         f"Baseline simulation failed: {base_sim.get('error_message')}"
     )
     base_failed = base_sim["total_failed"]
-    base_pop = base_sim["population_affected_estimate"]
+    base_pop = comparable_population(base_sim)
     base_waves = len(base_sim.get("waves", []))
 
     assert base_waves > 1, f"Expected multi-wave cascade, got {base_waves} wave(s)"
@@ -173,7 +228,7 @@ def main() -> int:
         f"Scenario simulation failed: {scen_sim.get('error_message')}"
     )
     scen_failed = scen_sim["total_failed"]
-    scen_pop = scen_sim["population_affected_estimate"]
+    scen_pop = comparable_population(scen_sim)
     scen_waves = len(scen_sim.get("waves", []))
     print(f"  ✓ Scenario cascade completed: {scen_failed} failed nodes across {scen_waves} waves (Pop affected: {scen_pop:,})")
 
@@ -185,8 +240,11 @@ def main() -> int:
         f"Assertion Failed: Total failed nodes was not strictly better. "
         f"Baseline: {base_failed}, Scenario: {scen_failed}"
     )
+    # Measured on the uncapped total (see comparable_population): the capped
+    # headline figure saturates, so both runs would report the study-area limit
+    # and a genuine improvement would read as "no change".
     assert scen_pop < base_pop, (
-        f"Assertion Failed: Population affected estimate was not strictly better. "
+        f"Assertion Failed: Population affected was not strictly better. "
         f"Baseline: {base_pop}, Scenario: {scen_pop}"
     )
 

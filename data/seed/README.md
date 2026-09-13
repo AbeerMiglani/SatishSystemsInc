@@ -22,6 +22,24 @@ Names use synthetic numbering such as `Junction 1`, `Hospital 1`, and
 not real institution or road names. The dataset does not provide exact
 population figures, observed traffic demand, or engineering failure data.
 
+## Provenance vocabulary
+
+Every node carries a `data_quality` label that is shown to the user in the map
+tooltip, the criticality panel, and the failure-selection chips. Permitted
+values:
+
+| Value       | Meaning |
+|-------------|---------|
+| `observed`  | Taken directly from a public source and not altered. |
+| `estimated` | Derived or assumed because no authoritative value was available. |
+| `derived`   | Computed from other fields in this dataset. |
+| `simulated` | Produced by the simulation engine rather than by any data source. |
+
+**Everything in this seed dataset is `estimated`.** The assets, capacities,
+loads, and population figures are synthetic, so nothing here may claim
+`observed`. `verified` is not a valid value — it was previously the ingestion
+default and overstated the provenance of fully synthetic data.
+
 ## Regeneration
 
 From the repository root:

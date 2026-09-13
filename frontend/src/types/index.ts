@@ -73,13 +73,38 @@ export interface SimulationResult {
   initial_failures: string[];
   waves: CascadeWave[];
   total_failed: number;
+  /** Population total after the study-area cap is applied. */
   population_affected_estimate: number;
+  /**
+   * Uncapped population total. Null for simulations recorded before this field
+   * existed. Use this for before/after comparisons: when both runs exceed the
+   * cap, `population_affected_estimate` is identical for each and a genuine
+   * improvement would otherwise be invisible.
+   */
+  raw_population_affected?: number | null;
   study_area_population_cap?: number;
   is_population_capped?: boolean;
   has_unresolved_overlap?: boolean;
+  /** False when the cascade was truncated at the wave guardrail. */
+  cascade_stabilized?: boolean;
   global_efficiency_before: number;
   global_efficiency_after: number;
   status: "pending" | "running" | "completed" | "failed";
+}
+
+/**
+ * Chooses the population figure to compare across runs.
+ *
+ * The capped estimate is the honest headline number, but it saturates: a
+ * baseline and an intervention that both exceed the study-area cap report the
+ * same value. Comparisons therefore use the uncapped total when it is
+ * available, falling back to the capped estimate for older records.
+ */
+export function comparablePopulation(result: {
+  population_affected_estimate: number;
+  raw_population_affected?: number | null;
+}): number {
+  return result.raw_population_affected ?? result.population_affected_estimate;
 }
 
 export type InterventionType = "upgrade_node" | "add_edge" | string;
