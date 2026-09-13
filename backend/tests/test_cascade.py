@@ -135,6 +135,143 @@ def test_far_node_survives_cascade():
         assert str(i) not in all_failed
 
 
+# ---------------------------------------------------------------------------
+# Capacity-weighted redistribution
+#
+# run_cascade has two redistribution branches: capacity-weighted when any
+# surviving out-link declares a `capacity`, and the legacy uniform split
+# otherwise. The tests above all use bare add_edge() calls and therefore only
+# ever exercise the uniform branch; the recommendation suites do set capacities
+# but always uniformly (100.0 everywhere), which is numerically identical to a
+# uniform split. These characterize the weighted branch: the proportional split,
+# the per-link clamp, and the zero-capacity guard.
+# ---------------------------------------------------------------------------
+
+def _fan_out(cap_to_b, cap_to_c, b_capacity, c_capacity, load=100.0):
+    """A fails immediately and sheds `load` across two out-links."""
+    G = nx.DiGraph()
+    G.add_node("A", current_load=load, capacity=1.0, failure_threshold=1.0)
+    G.add_node("B", current_load=0.0, capacity=b_capacity, failure_threshold=1.0)
+    G.add_node("C", current_load=0.0, capacity=c_capacity, failure_threshold=1.0)
+    if cap_to_b is None:
+        G.add_edge("A", "B")
+    else:
+        G.add_edge("A", "B", capacity=cap_to_b)
+    if cap_to_c is None:
+        G.add_edge("A", "C")
+    else:
+        G.add_edge("A", "C", capacity=cap_to_c)
+    return G
+
+
+def test_capacity_weighted_split_is_proportional_to_link_capacity():
+    """Load follows link capacity, not head count.
+
+    A sheds 100 across links of capacity 75 and 25, so B receives 75 and C
+    receives 25. The thresholds bracket those shares exactly: B (capacity 74.9)
+    must fail and C (capacity 25.1) must survive. A uniform 50/50 split would
+    invert both outcomes, so this discriminates the branch rather than merely
+    executing it.
+    """
+    G = _fan_out(cap_to_b=75.0, cap_to_c=25.0, b_capacity=74.9, c_capacity=25.1)
+
+    waves, _, _, _, _ = run_cascade(G, ["A"])
+
+    assert len(waves) == 2
+    assert set(waves[0]["failed_node_ids"]) == {"A"}
+    assert set(waves[1]["failed_node_ids"]) == {"B"}
+
+
+def test_uniform_split_when_no_link_declares_capacity():
+    """The legacy branch stays uniform: 100 across two links is 50 each.
+
+    Mirror image of the test above -- here B (capacity 49.9) fails and C
+    (capacity 50.1) survives, which a capacity-weighted split could not produce
+    from these inputs.
+    """
+    G = _fan_out(cap_to_b=None, cap_to_c=None, b_capacity=49.9, c_capacity=50.1)
+
+    waves, _, _, _, _ = run_cascade(G, ["A"])
+
+    assert len(waves) == 2
+    assert set(waves[1]["failed_node_ids"]) == {"B"}
+
+
+def test_one_declared_capacity_switches_the_whole_group_to_weighted():
+    """`any(capacity is not None ...)` is group-wide, not per-link.
+
+    A single declared capacity puts every sibling link on the weighted path,
+    where an undeclared link contributes zero capacity and therefore receives
+    nothing. B takes the entire load; C is starved despite being a live
+    successor.
+    """
+    G = _fan_out(cap_to_b=50.0, cap_to_c=None, b_capacity=99.9, c_capacity=0.1)
+
+    waves, _, _, _, _ = run_cascade(G, ["A"])
+
+    # B received min(50, 100 * 50/50) = 50, under its capacity of 99.9.
+    # C received nothing, so its capacity of 0.1 is never exceeded.
+    assert len(waves) == 1
+    assert set(waves[0]["failed_node_ids"]) == {"A"}
+
+
+def test_link_capacity_clamps_the_transferred_load():
+    """A link cannot carry more than its own capacity; the rest is shed.
+
+    A sheds 100 through a single link of capacity 10, so B receives 10, not 100.
+    Without the min() clamp B (capacity 50) would be overwhelmed and fail.
+    """
+    G = nx.DiGraph()
+    G.add_node("A", current_load=100.0, capacity=1.0, failure_threshold=1.0)
+    G.add_node("B", current_load=0.0, capacity=50.0, failure_threshold=1.0)
+    G.add_edge("A", "B", capacity=10.0)
+
+    waves, _, _, _, _ = run_cascade(G, ["A"])
+
+    assert len(waves) == 1
+    assert set(waves[0]["failed_node_ids"]) == {"A"}
+
+
+def test_zero_total_link_capacity_sheds_load_instead_of_redistributing():
+    """With no capacity anywhere to carry it, the load is dropped.
+
+    The `total_capacity > 0` guard means a zero-capacity link transfers nothing
+    rather than dividing by zero. B survives on a capacity of 1.0 that an
+    unguarded transfer of 100 would have destroyed.
+    """
+    G = nx.DiGraph()
+    G.add_node("A", current_load=100.0, capacity=1.0, failure_threshold=1.0)
+    G.add_node("B", current_load=0.0, capacity=1.0, failure_threshold=1.0)
+    G.add_edge("A", "B", capacity=0.0)
+
+    waves, _, _, _, _ = run_cascade(G, ["A"])
+
+    assert len(waves) == 1
+    assert set(waves[0]["failed_node_ids"]) == {"A"}
+
+
+def test_weighted_redistribution_skips_already_failed_successors():
+    """Capacity toward a dead neighbour is not counted in the denominator.
+
+    A and B fail together in wave 0. A's link to B must not absorb any share,
+    so C receives the full transfer its own link can carry (min(60, 100) = 60)
+    and fails at capacity 59.9 -- whereas splitting 100 across both links would
+    have sent C only 50 and left it standing.
+    """
+    G = nx.DiGraph()
+    G.add_node("A", current_load=100.0, capacity=1.0, failure_threshold=1.0)
+    G.add_node("B", current_load=0.0, capacity=1.0, failure_threshold=1.0)
+    G.add_node("C", current_load=0.0, capacity=59.9, failure_threshold=1.0)
+    G.add_edge("A", "B", capacity=40.0)
+    G.add_edge("A", "C", capacity=60.0)
+
+    waves, _, _, _, _ = run_cascade(G, ["A", "B"])
+
+    assert set(waves[0]["failed_node_ids"]) == {"A", "B"}
+    assert len(waves) == 2
+    assert set(waves[1]["failed_node_ids"]) == {"C"}
+
+
 def test_cascade_stabilizes_flag_true_when_settled():
     """A cascade that reaches a fixed point reports stabilized=True."""
     G = nx.DiGraph()
