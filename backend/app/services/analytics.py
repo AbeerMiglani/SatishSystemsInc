@@ -69,7 +69,7 @@ def calculate_betweenness_gds(network_id: str) -> list[dict[str, Any]]:
                        coalesce(n.is_synthetic, true) AS is_synthetic,
                        coalesce(n.data_source, 'synthetic') AS data_source,
                        coalesce(n.name_source, 'synthetic') AS name_source,
-                       coalesce(n.data_quality, 'verified') AS data_quality,
+                       coalesce(n.data_quality, 'estimated') AS data_quality,
                        score
                 ORDER BY score DESC
                 """,
@@ -88,7 +88,7 @@ def calculate_betweenness_gds(network_id: str) -> list[dict[str, Any]]:
                     "is_synthetic": row.get("is_synthetic", True) if row.get("is_synthetic") is not None else True,
                     "data_source": row.get("data_source", "synthetic") or "synthetic",
                     "name_source": row.get("name_source", "synthetic") or "synthetic",
-                    "data_quality": row.get("data_quality", "verified") or "verified",
+                    "data_quality": row.get("data_quality", "estimated") or "estimated",
                     "score": round(norm_score, 5),
                     "rank": idx + 1,
                 })
@@ -125,7 +125,7 @@ def calculate_betweenness_nx(network_id: str, db: Session | None = None) -> list
                 is_synthetic=getattr(n, "is_synthetic", True),
                 data_source=getattr(n, "data_source", "synthetic"),
                 name_source=getattr(n, "name_source", "synthetic"),
-                data_quality=getattr(n, "data_quality", "verified"),
+                data_quality=getattr(n, "data_quality", "estimated"),
             )
         for e in edges:
             G.add_edge(str(e.source_id), str(e.target_id))
@@ -196,7 +196,7 @@ def calculate_pagerank_gds(network_id: str) -> list[dict[str, Any]]:
                        coalesce(n.is_synthetic, true) AS is_synthetic,
                        coalesce(n.data_source, 'synthetic') AS data_source,
                        coalesce(n.name_source, 'synthetic') AS name_source,
-                       coalesce(n.data_quality, 'verified') AS data_quality,
+                       coalesce(n.data_quality, 'estimated') AS data_quality,
                        score
                 ORDER BY score DESC
                 """,
@@ -213,7 +213,7 @@ def calculate_pagerank_gds(network_id: str) -> list[dict[str, Any]]:
                     "is_synthetic": row.get("is_synthetic", True) if row.get("is_synthetic") is not None else True,
                     "data_source": row.get("data_source", "synthetic") or "synthetic",
                     "name_source": row.get("name_source", "synthetic") or "synthetic",
-                    "data_quality": row.get("data_quality", "verified") or "verified",
+                    "data_quality": row.get("data_quality", "estimated") or "estimated",
                     "score": round(float(row["score"]), 5),
                     "rank": idx + 1,
                 })
@@ -247,7 +247,7 @@ def calculate_pagerank_nx(network_id: str, db: Session | None = None) -> list[di
                 is_synthetic=getattr(n, "is_synthetic", True),
                 data_source=getattr(n, "data_source", "synthetic"),
                 name_source=getattr(n, "name_source", "synthetic"),
-                data_quality=getattr(n, "data_quality", "verified"),
+                data_quality=getattr(n, "data_quality", "estimated"),
             )
         for e in edges:
             G.add_edge(str(e.source_id), str(e.target_id))

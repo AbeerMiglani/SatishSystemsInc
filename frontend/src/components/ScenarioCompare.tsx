@@ -3,6 +3,7 @@ import { useCompareScenarios, useNetworkTopology } from "../api/hooks";
 import { useSimulationStore } from "../stores/simulationStore";
 import { useUIStore } from "../stores/uiStore";
 import type { InfraNode } from "../types";
+import { comparablePopulation } from "../types";
 
 const ScenarioCompare: React.FC = () => {
   const networkId = useUIStore((s) => s.networkId);
@@ -190,6 +191,54 @@ const ScenarioCompare: React.FC = () => {
       {isLoading && <p style={{ fontSize: 12, color: "#94a3b8" }}>Loading comparison...</p>}
       {error && <p style={{ color: "#ef4444", fontSize: 12 }}>{(error as Error).message}</p>}
 
+      {data && (() => {
+        // Deltas are computed from the uncapped totals. Using the capped
+        // headline figure would report "no change" whenever both runs exceed
+        // the study-area cap, contradicting the recommendation panel.
+        const basePop = comparablePopulation(data.baseline_result);
+        const scenPop = comparablePopulation(data.scenario_result);
+        const popDelta = scenPop - basePop;
+        const failedDelta = data.scenario_result.total_failed - data.baseline_result.total_failed;
+        const eitherCapped =
+          data.baseline_result.is_population_capped || data.scenario_result.is_population_capped;
+        return (
+          <div
+            style={{
+              marginBottom: 10,
+              padding: "8px 10px",
+              background: "#0f172a",
+              border: "1px solid #334155",
+              borderRadius: 4,
+              fontSize: 12,
+            }}
+          >
+            <div style={{ color: "#94a3b8", fontSize: 11, marginBottom: 4, fontWeight: 600 }}>
+              Verified change (scenario vs baseline)
+            </div>
+            <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+              <span>
+                Failed assets:{" "}
+                <strong style={{ color: failedDelta < 0 ? "#4ade80" : failedDelta > 0 ? "#f87171" : "#e2e8f0" }}>
+                  {failedDelta > 0 ? "+" : ""}{failedDelta}
+                </strong>
+              </span>
+              <span>
+                Population:{" "}
+                <strong style={{ color: popDelta < 0 ? "#4ade80" : popDelta > 0 ? "#f87171" : "#e2e8f0" }}>
+                  {popDelta > 0 ? "+" : ""}{popDelta.toLocaleString()}
+                </strong>
+              </span>
+            </div>
+            {eitherCapped && (
+              <div style={{ color: "#64748b", fontSize: 10, marginTop: 4 }}>
+                Population change measured on the uncapped exposure sum, because the
+                capped headline figure saturates for both runs.
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {data && (
         <div style={{ display: "flex", gap: 12 }}>
           <div style={{ flex: 1, padding: 10, background: "#0f172a", borderRadius: 4, border: "1px solid #334155" }}>
@@ -199,7 +248,7 @@ const ScenarioCompare: React.FC = () => {
             </p>
             <div style={{ margin: "3px 0", fontSize: 12, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 4 }}>
               <span>
-                Pop Affected: <strong>{data.baseline_result.population_affected_estimate.toLocaleString()}</strong>
+                Pop Affected: <strong>{comparablePopulation(data.baseline_result).toLocaleString()}</strong>
               </span>
               {data.baseline_result.has_unresolved_overlap && (
                 <span
@@ -211,7 +260,10 @@ const ScenarioCompare: React.FC = () => {
               )}
             </div>
             {data.baseline_result.is_population_capped && (
-              <span style={{ color: "#94a3b8", fontSize: 10, display: "block" }}>(Capped at 65k)</span>
+              <span style={{ color: "#94a3b8", fontSize: 10, display: "block" }}>
+                Uncapped sum; headline capped at{" "}
+                {(data.baseline_result.study_area_population_cap ?? 65000).toLocaleString()}
+              </span>
             )}
             <p style={{ margin: "3px 0", fontSize: 12 }}>Waves: {data.baseline_result.waves.length}</p>
             {data.baseline_result.global_efficiency_after !== null && (
@@ -227,7 +279,7 @@ const ScenarioCompare: React.FC = () => {
             </p>
             <div style={{ margin: "3px 0", fontSize: 12, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 4 }}>
               <span>
-                Pop Affected: <strong>{data.scenario_result.population_affected_estimate.toLocaleString()}</strong>
+                Pop Affected: <strong>{comparablePopulation(data.scenario_result).toLocaleString()}</strong>
               </span>
               {data.scenario_result.has_unresolved_overlap && (
                 <span
@@ -239,7 +291,10 @@ const ScenarioCompare: React.FC = () => {
               )}
             </div>
             {data.scenario_result.is_population_capped && (
-              <span style={{ color: "#a7f3d0", fontSize: 10, display: "block" }}>(Capped at 65k)</span>
+              <span style={{ color: "#a7f3d0", fontSize: 10, display: "block" }}>
+                Uncapped sum; headline capped at{" "}
+                {(data.scenario_result.study_area_population_cap ?? 65000).toLocaleString()}
+              </span>
             )}
             <p style={{ margin: "3px 0", fontSize: 12 }}>Waves: {data.scenario_result.waves.length}</p>
             {data.scenario_result.global_efficiency_after !== null && (

@@ -3,6 +3,7 @@ import { useUIStore } from "../stores/uiStore";
 import { useSimulationStore } from "../stores/simulationStore";
 import { useRunSimulation, useSimulationResult, useCreateScenario, useNetworkTopology } from "../api/hooks";
 import type { InfraNode } from "../types";
+import { comparablePopulation } from "../types";
 import CascadeTimeline from "./CascadeTimeline";
 import RecommendationPanel from "./RecommendationPanel";
 
@@ -310,7 +311,12 @@ const ControlPanel: React.FC = () => {
           <p style={{ margin: "4px 0", fontSize: 13 }}>Waves: <span style={{ color: "#3b82f6" }}>{result.waves.length}</span></p>
           <p style={{ margin: "4px 0", fontSize: 13 }}>Failed Assets: <span style={{ color: "#ef4444" }}>{result.total_failed}</span></p>
           <div style={{ margin: "4px 0", fontSize: 13, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
-            <span>Pop Affected: <strong style={{ color: "#f59e0b" }}>{result.population_affected_estimate.toLocaleString()}</strong></span>
+            <span>
+              Pop Affected:{" "}
+              <strong style={{ color: "#f59e0b" }}>
+                {comparablePopulation(result).toLocaleString()}
+              </strong>
+            </span>
             {result.has_unresolved_overlap && (
               <span
                 title="Multiple utility failure areas overlap without parcel-level polygon data. Total is capped at study-area limit."
@@ -332,7 +338,30 @@ const ControlPanel: React.FC = () => {
           </div>
           {result.is_population_capped && (
             <span style={{ color: "#94a3b8", fontSize: 11, display: "block", marginBottom: 4 }}>
-              (Capped at {result.study_area_population_cap?.toLocaleString() || "65,000"} municipal limit)
+              Uncapped exposure sum; service areas overlap. Headline figure is
+              capped at the {(result.study_area_population_cap ?? 65000).toLocaleString()}{" "}
+              study-area limit
+              {result.raw_population_affected != null &&
+                ` (reported as ${result.population_affected_estimate.toLocaleString()})`}
+              .
+            </span>
+          )}
+          {result.cascade_stabilized === false && (
+            <span
+              title="The cascade was still spreading when it reached the configured wave limit. The result below is a valid bounded snapshot, not a settled end state."
+              style={{
+                display: "inline-block",
+                background: "#7c2d12",
+                border: "1px solid #ea580c",
+                color: "#fed7aa",
+                borderRadius: 4,
+                padding: "1px 6px",
+                fontSize: 10,
+                fontWeight: 600,
+                marginBottom: 4,
+              }}
+            >
+              ⏱ Truncated at wave limit — not stabilized
             </span>
           )}
           {result.global_efficiency_before !== null && result.global_efficiency_after !== null && (

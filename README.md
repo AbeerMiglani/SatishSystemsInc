@@ -38,6 +38,24 @@ This starts:
 
 Wait for all health checks to pass (~30s for Neo4j's first startup).
 
+> **Upgrading an existing database?** Revision `c4f2a7d9e1b1` was an abandoned
+> migration branch and has been removed — it left the history with two heads,
+> which made `alembic upgrade head` fail and blocked the `migrator` and `seeder`
+> services. A fresh database needs no action. A database that was stamped at that
+> revision directly must be repaired once, because the surviving branch re-adds
+> two of its columns:
+>
+> ```sql
+> ALTER TABLE nodes DROP COLUMN IF EXISTS name_source;
+> ALTER TABLE nodes DROP COLUMN IF EXISTS data_quality;
+> ```
+> ```bash
+> alembic stamp bbb3dbb1490c && alembic upgrade head
+> ```
+>
+> Its remaining columns are nullable or carry server defaults, so leaving them in
+> place is harmless. Check with `alembic current` if you are unsure.
+
 ### 3. Verify the backend
 
 ```bash
@@ -119,11 +137,10 @@ ripple/
 │   └── tests/
 ├── frontend/
 │   └── src/
-│       ├── components/         # React components
-│       ├── layers/             # deck.gl layer defs
+│       ├── components/         # React components (incl. deck.gl layer defs)
 │       ├── stores/             # Zustand state
 │       ├── api/                # TanStack Query hooks
-│       └── data/               # Stub data (Phase 0.5)
+│       └── types/              # Shared TypeScript types
 └── data/
     ├── seed/                   # GeoJSON seed dataset
     └── scripts/                # Data generation
@@ -144,16 +161,20 @@ Rather than relying on heuristic estimates or unverified approximations, every r
 
 ### Candidate Intervention Types
 The engine generates two distinct intervention types based on topological vulnerability:
-- **`upgrade_node` (Hardening):** Multiplies or hardens the operational capacity and failure threshold of critical downstream transit bottlenecks (such as wave-1 casualties absorbing initial failure shock).
+- **`upgrade_node` (Hardening):** Raises the operational capacity of critical downstream transit bottlenecks (such as wave-1 casualties absorbing initial failure shock). Candidates are evaluated at double their baseline capacity; the failure threshold is left unchanged.
 - **`add_edge` (Redundancy):** Generates structural bypass connections linking surviving operational assets to disconnected downstream service areas that lost upstream connectivity due to wave-1 casualties.
 
 ### Deterministic Multi-Factor Ranking
-Candidates are evaluated and deterministically ranked according to a prioritized hierarchy:
-1. **`protects_critical_services` (Hospital Preservation):** Top priority is given to interventions that save life-safety and acute healthcare facilities (hospitals) from failing during the cascade.
-2. **`failures_prevented`:** Net reduction in total failed nodes compared to the baseline cascade outcome.
+Candidates are ranked by the sort key in `get_recommendations`, applied in this order:
+1. **`failures_prevented`:** Net reduction in total failed nodes compared to the baseline cascade outcome.
+2. **`protects_critical_services` (Hospital Preservation):** Among candidates preventing an equal number of failures, those that keep a hospital online rank higher.
 3. **`raw_population_saved`:** Number of citizens spared from power, water, or telecommunications outages.
 4. **`efficiency_gain`:** Post-cascade global network transmission efficiency delta ($\Delta E$).
 5. **Canonical ID tie-breaking:** Deterministic alphabetical tie-breaking on UUID ensures 100% reproducible ordering.
+
+Critical-service protection is therefore a tie-breaker *within* an impact tier, not
+an override of it: an intervention that prevents more failures outranks one that
+prevents fewer but happens to protect a hospital.
 
 ### 1-Click Execution & Seamless Comparison
 Every candidate returned by `GET /api/simulations/{id}/recommendations` carries a pre-synthesized `scenario_payload`. When an operator applies a recommendation in the UI or via API:
@@ -166,8 +187,11 @@ Every candidate returned by `GET /api/simulations/{id}/recommendations` carries 
 ## Key Metrics & Disclaimers
 
 - **Betweenness Centrality by Default:** Structural bottleneck criticality is calculated using Betweenness Centrality over the directed dependency topology, identifying nodes that lie on the greatest fraction of shortest paths across municipal infrastructure sectors.
-- **Population Impact & Municipal Cap:** Raw population impact sums the `population_served` across all affected assets. To prevent unrealistic double-counting across overlapping municipal service zones, estimates are formally capped at the total study-area municipal population (**65,000** citizens for the Manipal study area).
-- **Unresolved Overlap Flag:** The system computes both `is_population_capped` and `has_unresolved_overlap` flags. When overlapping service areas cannot be geometrically resolved at the ward level, the API and UI explicitly flag estimates to maintain forensic transparency.
+- **Population Impact & Municipal Cap:** Raw population impact sums the `population_served` across all affected assets. To prevent unrealistic double-counting across overlapping municipal service zones, the headline estimate is capped at the total study-area municipal population (**65,000** citizens for the Manipal study area).
+- **Capped vs. Uncapped Figures:** Simulations record both the capped `population_affected_estimate` and the uncapped `raw_population_affected`. Because a baseline and an intervention can *both* exceed the cap — reporting an identical headline figure and hiding a real improvement — before/after comparisons in the UI, the demo script and the E2E test are computed on the uncapped total while the cap remains disclosed. `raw_population_affected` is null for simulations recorded before that field existed.
+- **Unresolved Overlap Flag:** The system computes `is_population_capped` and `has_unresolved_overlap`. Both are returned by `GET /api/simulations/{id}` and rendered in the UI, so a capped or overlap-affected estimate is always flagged rather than presented as a precise count.
+- **Cascade Stability:** `cascade_stabilized` is false when a cascade was still spreading at the configured wave guardrail (`MAX_CASCADE_WAVES`, default 50). Such a run returns a valid bounded result and is labelled as truncated in the UI rather than being discarded.
+- **Data Provenance:** Every node carries a `data_quality` label (`observed` / `estimated` / `derived` / `simulated`). The shipped seed dataset is entirely synthetic and is labelled `estimated` throughout — see `data/seed/README.md` for the vocabulary.
 
 ---
 

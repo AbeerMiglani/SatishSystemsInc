@@ -89,7 +89,7 @@ def get_centrality(
                 r.setdefault("is_synthetic", getattr(node, "is_synthetic", True))
                 r.setdefault("data_source", getattr(node, "data_source", "synthetic"))
                 r.setdefault("name_source", getattr(node, "name_source", "synthetic"))
-                r.setdefault("data_quality", getattr(node, "data_quality", "verified"))
+                r.setdefault("data_quality", getattr(node, "data_quality", "estimated"))
             else:
                 r.setdefault("name", f"Node {str(r.get('node_id'))[:8]}")
                 r.setdefault("display_name", f"Node {str(r.get('node_id'))[:8]}")
@@ -97,6 +97,6 @@ def get_centrality(
                 r.setdefault("is_synthetic", True)
                 r.setdefault("data_source", "synthetic")
                 r.setdefault("name_source", "synthetic")
-                r.setdefault("data_quality", "verified")
+                r.setdefault("data_quality", "estimated")
 
     return results

@@ -233,7 +233,7 @@ def test_stress_conflicting_candidate_priorities():
     G.add_edge(d_id, x_id, weight=1.0, capacity=100.0, edge_type="power_supply")
     G.add_edge(x_id, y_id, weight=1.0, capacity=100.0, edge_type="power_supply")
 
-    waves, _, eff_a, _ = run_cascade(G, [root])
+    waves, _, eff_a, _, _ = run_cascade(G, [root])
     total_failed = sum(len(w["failed_node_ids"]) for w in waves)
     assert total_failed == 8  # all nodes fail
 
@@ -309,7 +309,7 @@ def test_stress_initial_hospital_failure_not_revivable():
     G.add_edge(hosp, sub, weight=1.0, capacity=100.0, edge_type="power_supply")
     G.add_edge(sub, res, weight=1.0, capacity=100.0, edge_type="power_supply")
 
-    waves, _, eff_a, _ = run_cascade(G, [hosp])
+    waves, _, eff_a, _, _ = run_cascade(G, [hosp])
     sim = SimulationResult(
         id=uuid.uuid4(),
         network_id=uuid.uuid4(),
@@ -359,7 +359,7 @@ def test_stress_add_edge_candidate_validity_guarantees():
     G.add_edge(surv_gen, surv_node, weight=1.0, capacity=100.0, edge_type="power_supply")
     G.add_edge(surv_node, surv_gen, weight=1.0, capacity=100.0, edge_type="power_supply")
 
-    waves, _, eff_a, _ = run_cascade(G, [gen])
+    waves, _, eff_a, _, _ = run_cascade(G, [gen])
     sim = SimulationResult(
         id=uuid.uuid4(),
         network_id=uuid.uuid4(),
@@ -434,7 +434,7 @@ def test_stress_directed_cycles_and_feedback_loops():
     G.add_edge(d, e, weight=1.0, capacity=100.0, edge_type="power_supply")
     G.add_edge(e, f, weight=1.0, capacity=100.0, edge_type="power_supply")
 
-    waves, _, eff_a, _ = run_cascade(G, [a])
+    waves, _, eff_a, _, _ = run_cascade(G, [a])
     assert len(waves) >= 2
 
     sim = SimulationResult(
@@ -493,7 +493,7 @@ def test_stress_disconnected_components_and_isolated_nodes():
     G.add_edge(s1, s2, weight=1.0, capacity=100.0, edge_type="power_supply")
     G.add_edge(s2, s3, weight=1.0, capacity=100.0, edge_type="power_supply")
 
-    waves, _, eff_a, _ = run_cascade(G, [a])
+    waves, _, eff_a, _, _ = run_cascade(G, [a])
     sim = SimulationResult(
         id=uuid.uuid4(),
         network_id=uuid.uuid4(),
@@ -537,7 +537,7 @@ def test_stress_catastrophic_total_blackout_returns_empty():
     G.add_edge(n1, n2, weight=1.0, capacity=10000.0, edge_type="power_supply")
     G.add_edge(n2, n3, weight=1.0, capacity=10000.0, edge_type="power_supply")
 
-    waves, _, eff_a, _ = run_cascade(G, [root])
+    waves, _, eff_a, _, _ = run_cascade(G, [root])
     sim = SimulationResult(
         id=uuid.uuid4(),
         network_id=uuid.uuid4(),
@@ -584,7 +584,7 @@ def test_stress_honest_rerun_oracle_exact_deltas():
     G.add_edge(b, h, weight=1.0, capacity=100.0, edge_type="power_supply")
     G.add_edge(c, d, weight=1.0, capacity=100.0, edge_type="power_supply")
 
-    waves, _, eff_a, _ = run_cascade(G, [a])
+    waves, _, eff_a, _, _ = run_cascade(G, [a])
     total_failed_baseline = sum(len(w["failed_node_ids"]) for w in waves)
     all_failed_baseline = set()
     for w in waves:
@@ -625,7 +625,7 @@ def test_stress_honest_rerun_oracle_exact_deltas():
                 )
 
         # Independent rerun
-        cand_waves, _, eff_cand, _ = run_cascade(G_mod, [a])
+        cand_waves, _, eff_cand, _, _ = run_cascade(G_mod, [a])
         cand_failed = set()
         for w in cand_waves:
             cand_failed.update(w["failed_node_ids"])
@@ -712,7 +712,7 @@ def test_stress_harmful_edge_never_recommended():
     G.add_edge(root, w1, weight=1.0, capacity=100.0, edge_type="power_supply")
     G.add_edge(w1, succ, weight=1.0, capacity=100.0, edge_type="power_supply")
 
-    waves, _, eff_a, _ = run_cascade(G, [root])
+    waves, _, eff_a, _, _ = run_cascade(G, [root])
     sim = SimulationResult(
         id=uuid.uuid4(),
         network_id=uuid.uuid4(),

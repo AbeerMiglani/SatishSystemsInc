@@ -1,9 +1,18 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from typing import Any
 
 import networkx as nx
+
+logger = logging.getLogger(__name__)
+
+#: Default wave guardrail. The engine stays free of application configuration
+#: so it can be driven standalone (tests, diagnosis, stress runs) without a
+#: database or settings object; callers that have settings inject their own
+#: bound via ``max_waves`` -- see ``app.simulation.runner``.
+DEFAULT_MAX_WAVES = 50
 
 
 def calculate_global_efficiency(G: nx.DiGraph, N_baseline: int | None = None) -> float:
@@ -31,13 +40,22 @@ def calculate_global_efficiency(G: nx.DiGraph, N_baseline: int | None = None) ->
 
 
 def run_cascade(
-    G_baseline: nx.DiGraph, 
-    initial_failures: list[str], 
-    max_waves: int = 50,
+    G_baseline: nx.DiGraph,
+    initial_failures: list[str],
+    max_waves: int = DEFAULT_MAX_WAVES,
     on_wave_completed: Callable[[dict[str, Any]], None] | None = None,
-) -> tuple[list[dict[str, Any]], float, float, int]:
+) -> tuple[list[dict[str, Any]], float, float, int, bool]:
     """
     Runs the Motter-Lai uniform load redistribution cascade algorithm in-memory.
+
+    Returns ``(waves, efficiency_before, efficiency_after, population_affected,
+    stabilized)``.
+
+    ``stabilized`` is False when the cascade was still producing new failures at
+    ``max_waves`` and was therefore truncated. A truncated cascade is a valid
+    bounded result and is returned normally: the guardrail bounds the work, it
+    does not invalidate the analysis. Callers are expected to surface the flag
+    so a truncated run is never presented as a settled one.
     """
     unknown_initial_failures = set(initial_failures) - set(G_baseline.nodes)
     if unknown_initial_failures:
@@ -117,8 +135,16 @@ def run_cascade(
                 
         current_wave_idx += 1
         
-    if failed_in_wave:
-        raise RuntimeError(f"cascade exceeded max_waves={max_waves}")
+    # Nodes still failing at the guardrail mean the cascade had not settled.
+    # Report the bounded result rather than discarding the whole simulation.
+    stabilized = not failed_in_wave
+    if not stabilized:
+        logger.warning(
+            "cascade truncated at max_waves=%s with %d node(s) still failing; "
+            "returning bounded result",
+            max_waves,
+            len(failed_in_wave),
+        )
 
     eff_after = calculate_global_efficiency(G, N_baseline=len(G_baseline))
     
@@ -128,4 +154,4 @@ def run_cascade(
         if f in G_baseline.nodes:
             pop_affected += G_baseline.nodes[f].get('population_served', 0)
             
-    return waves, eff_before, eff_after, pop_affected
+    return waves, eff_before, eff_after, pop_affected, stabilized

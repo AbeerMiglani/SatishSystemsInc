@@ -212,7 +212,7 @@ def test_seed_ingestion_120_nodes_succeeds_with_non_null_display_names():
             is_synthetic BOOLEAN NOT NULL DEFAULT 1,
             data_source TEXT NOT NULL DEFAULT 'synthetic',
             name_source TEXT NOT NULL DEFAULT 'synthetic',
-            data_quality TEXT NOT NULL DEFAULT 'verified'
+            data_quality TEXT NOT NULL DEFAULT 'estimated'
         )
     """)
 
@@ -243,7 +243,7 @@ def test_seed_ingestion_120_nodes_succeeds_with_non_null_display_names():
         coords = feature["geometry"]["coordinates"]
         display_name = props.get("display_name") or props["name"]
         name_source = props.get("name_source", "synthetic")
-        data_quality = props.get("data_quality", "verified")
+        data_quality = props.get("data_quality", "estimated")
 
         # Create Node model instance
         node = Node(
@@ -298,7 +298,7 @@ def test_seed_ingestion_120_nodes_succeeds_with_non_null_display_names():
         assert len(node.display_name) > 0
         assert node.display_name == node.name
         assert node.name_source == "synthetic"
-        assert node.data_quality == "verified"
+        assert node.data_quality == "estimated"
 
 
 def test_graph_sync_provenance_to_neo4j():
