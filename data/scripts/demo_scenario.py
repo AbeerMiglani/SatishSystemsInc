@@ -194,6 +194,37 @@ def info(msg: str) -> None:
     print(f"  {ANSI_YELLOW}→{ANSI_RESET} {msg}")
 
 
+def recommendation_label(rec: dict) -> str:
+    """Human-readable name for the asset a recommendation acts on."""
+    return rec.get("display_name") or rec.get("node_name") or str(rec.get("node_id", ""))[:8]
+
+
+def describe_intervention(rec: dict) -> str:
+    """One-line description of a recommendation, for either intervention type.
+
+    ``proposed_capacity`` is ``None`` on every ``add_edge`` recommendation, and
+    recommendations of both types are ranked against each other, so a redundancy
+    link can come back as rank 1. Formatting the capacity unconditionally both
+    mislabels that intervention as an upgrade and raises ``TypeError`` on the
+    ``None``.
+    """
+    name = recommendation_label(rec)
+
+    if rec.get("intervention_type") == "add_edge":
+        target_id = rec.get("target_node_id")
+        target = (
+            rec.get("target_display_name")
+            or rec.get("target_node_name")
+            or (f"Node {str(target_id)[:8]}" if target_id else "unknown target")
+        )
+        return f"add redundant link {name!r} ➔ {target!r}"
+
+    capacity = rec.get("proposed_capacity")
+    if capacity is None:
+        return f"upgrade {name!r}"
+    return f"upgrade {name!r} (capacity → {capacity:.1f})"
+
+
 def ascii_table(rows: list[tuple[str, str, str, str]], col_widths: tuple[int, int, int, int]) -> None:
     """Print a simple 4-column ASCII table."""
     w0, w1, w2, w3 = col_widths
@@ -289,7 +320,7 @@ def main() -> None:
 
     ok(f"{len(recs)} recommendation(s) returned")
     for rec in recs:
-        name = rec.get("display_name") or rec.get("node_name") or rec["node_id"][:8]
+        name = recommendation_label(rec)
         print(
             f"    #{rec['rank']} {name:30s} "
             f"| prevented: {rec['failures_prevented']:>3}  "
@@ -302,8 +333,7 @@ def main() -> None:
     # ------------------------------------------------------------------
     header("Step 5: Applying top recommendation & re-simulating")
     top_rec = recs[0]
-    top_rec_name = top_rec.get("display_name") or top_rec.get("node_name") or top_rec["node_id"][:8]
-    info(f"Intervention: upgrade {top_rec_name!r} (capacity → {top_rec['proposed_capacity']:.1f})")
+    info(f"Intervention: {describe_intervention(top_rec)}")
 
     # Create scenario using the ready-to-post payload from the backend
     scenario_payload = top_rec["scenario_payload"]

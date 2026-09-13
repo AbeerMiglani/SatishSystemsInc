@@ -4,8 +4,6 @@ import { useSimulationStore } from "../stores/simulationStore";
 import { useRunSimulation, useSimulationResult, useCreateScenario, useNetworkTopology } from "../api/hooks";
 import type { InfraNode } from "../types";
 import { comparablePopulation } from "../types";
-import CascadeTimeline from "./CascadeTimeline";
-import RecommendationPanel from "./RecommendationPanel";
 
 const ControlPanel: React.FC = () => {
   const mode = useUIStore((s) => s.mode);
@@ -26,7 +24,8 @@ const ControlPanel: React.FC = () => {
     return map;
   }, [topology]);
 
-  const { result, reset, setSimulationResult } = useSimulationStore();
+  const { result, reset, setSimulationResult, addSimulation, registerScenario } =
+    useSimulationStore();
   const [dismissedSimulationIds, setDismissedSimulationIds] = useState<Set<string>>(new Set());
   
   const simMutation = useRunSimulation();
@@ -35,25 +34,33 @@ const ControlPanel: React.FC = () => {
   const { data: polledResult } = useSimulationResult(simMutation.data?.id || null);
 
   useEffect(() => {
-    if (polledResult && polledResult.status === "completed") {
-      if (!dismissedSimulationIds.has(polledResult.id) && (!result || result.id !== polledResult.id)) {
-        setSimulationResult(polledResult);
-      }
-      try {
-        const existing = JSON.parse(localStorage.getItem("ripple_simulations") || "[]");
-        if (!existing.some((s: any) => s.id === polledResult.id)) {
-          existing.unshift({
-            id: polledResult.id,
-            network_id: polledResult.network_id,
-            initial_failures: polledResult.initial_failures,
-            created_at: new Date().toISOString(),
-          });
-          localStorage.setItem("ripple_simulations", JSON.stringify(existing.slice(0, 20)));
-          window.dispatchEvent(new Event("ripple_simulations_updated"));
-        }
-      } catch {}
+    if (!polledResult || polledResult.status !== "completed") return;
+
+    // The store owns persistence of `ripple_simulations`; setSimulationResult
+    // records the run as part of adopting it.
+    if (!dismissedSimulationIds.has(polledResult.id) && (!result || result.id !== polledResult.id)) {
+      setSimulationResult(polledResult);
+      return;
     }
-  }, [polledResult, result, dismissedSimulationIds, setSimulationResult]);
+
+    // Dismissed, or already the active result — setSimulationResult is skipped,
+    // so record the run directly instead of losing it from history. The
+    // already-stored check reads through getState() rather than subscribing to
+    // `simulations`, so this effect cannot be re-triggered by its own write.
+    if (useSimulationStore.getState().simulations.some((s) => s.id === polledResult.id)) return;
+
+    addSimulation(
+      {
+        id: polledResult.id,
+        network_id: polledResult.network_id,
+        initial_failures: polledResult.initial_failures,
+        total_failed: polledResult.total_failed,
+        is_baseline: false,
+        created_at: new Date().toISOString(),
+      },
+      false
+    );
+  }, [polledResult, result, dismissedSimulationIds, setSimulationResult, addSimulation]);
 
   const handleRunBaseline = () => {
     if (!networkId || selectedNodeIds.size === 0) return;
@@ -82,18 +89,16 @@ const ControlPanel: React.FC = () => {
         initial_failures: Array.from(selectedNodeIds)
       });
       
-      try {
-        const existingScenarios = JSON.parse(localStorage.getItem("ripple_scenarios") || "[]");
-        existingScenarios.unshift({
-          id: scenario.id,
-          name: scenario.name,
-          network_id: scenario.network_id,
-          initial_failures: scenario.initial_failures,
-          created_at: new Date().toISOString(),
-        });
-        localStorage.setItem("ripple_scenarios", JSON.stringify(existingScenarios.slice(0, 20)));
-        window.dispatchEvent(new Event("ripple_scenarios_updated"));
-      } catch {}
+      // registerScenario persists to `ripple_scenarios` and updates the store's
+      // `scenarios` / `lastAppliedScenarioId`, so ScenarioCompare picks the new
+      // scenario up immediately rather than only after a reload.
+      registerScenario({
+        id: scenario.id,
+        name: scenario.name,
+        network_id: scenario.network_id,
+        initial_failures: scenario.initial_failures,
+        created_at: scenario.created_at ?? new Date().toISOString(),
+      });
 
       // Run the scenario simulation
       simMutation.mutate({
@@ -369,9 +374,6 @@ const ControlPanel: React.FC = () => {
           )}
         </div>
       )}
-
-      {result && result.waves.length > 0 && <CascadeTimeline />}
-      <RecommendationPanel />
     </div>
   );
 };
