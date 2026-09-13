@@ -4,7 +4,7 @@ Uses GeoAlchemy2 for PostGIS geometries.
 """
 
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from geoalchemy2 import Geometry
 from sqlalchemy import (
@@ -21,9 +21,11 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, validates
 
 from app.db.postgres import Base
+
+UTC = getattr(datetime, "UTC", timezone.utc)  # noqa: UP017
 
 
 class Network(Base):
@@ -81,6 +83,23 @@ class Node(Base):
         default="operational",
         nullable=False,
     )
+    is_synthetic = Column(Boolean, nullable=False, default=True, server_default="true")
+    data_source = Column(String, nullable=False, default="synthetic", server_default="synthetic")
+    display_name = Column(String, nullable=False)
+    name_source = Column(String, nullable=False, default="synthetic", server_default="synthetic")
+    data_quality = Column(String, nullable=False, default="verified", server_default="verified")
+
+    @validates("name")
+    def sync_display_name_from_name(self, key, value):
+        if not getattr(self, "display_name", None):
+            self.display_name = value
+        return value
+
+    @validates("display_name")
+    def validate_display_name(self, key, value):
+        if not value and getattr(self, "name", None):
+            return self.name
+        return value
 
     network = relationship("Network", back_populates="nodes")
     # Relationships for edges where this node is source/target
@@ -159,6 +178,9 @@ class SimulationResult(Base):
     
     total_failed = Column(Integer, nullable=False, default=0)
     population_affected_estimate = Column(Integer, nullable=False, default=0)
+    study_area_population_cap = Column(Integer, nullable=False, default=65000, server_default="65000")
+    is_population_capped = Column(Boolean, nullable=False, default=False, server_default="false")
+    has_unresolved_overlap = Column(Boolean, nullable=False, default=False, server_default="false")
     global_efficiency_before = Column(Float, nullable=True)
     global_efficiency_after = Column(Float, nullable=True)
     

@@ -1,5 +1,6 @@
 import logging
 import uuid
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -54,10 +55,14 @@ def get_edges(
 
 
 @router.get("/{network_id}/centrality", response_model=list[CentralityScore])
-def get_centrality(network_id: uuid.UUID, db: Session = Depends(get_db)):
+def get_centrality(
+    network_id: uuid.UUID,
+    metric: Literal["betweenness", "pagerank"] = Query(default="betweenness"),
+    db: Session = Depends(get_db),
+):
     """
-    Calculate and return PageRank centrality scores for all nodes in the network
-    using Neo4j Graph Data Science.
+    Calculate and return centrality scores for all nodes in the network.
+    Default metric is Betweenness Centrality (primary), with PageRank as secondary.
     """
     # Verify network exists
     net = db.query(Network).filter(Network.id == network_id).first()
@@ -65,8 +70,33 @@ def get_centrality(network_id: uuid.UUID, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Network not found")
         
     try:
-        results = calculate_centrality(str(network_id))
-        return results
+        results = calculate_centrality(str(network_id), metric=metric, db=db)
     except Exception:
-        logger.exception("centrality calculation failed for network %s", network_id)
+        logger.exception("centrality calculation failed for network %s with metric %s", network_id, metric)
         raise HTTPException(status_code=503, detail="Centrality service unavailable")
+
+    # Defensive enrichment: If results lack name/node_type, populate from PostgreSQL
+    missing_meta = any("name" not in r or "node_type" not in r for r in results)
+    if missing_meta and results:
+        node_records = db.query(Node).filter(Node.network_id == network_id).all()
+        node_lookup = {str(n.id): n for n in node_records}
+        for r in results:
+            node = node_lookup.get(str(r.get("node_id")))
+            if node:
+                r.setdefault("name", node.name)
+                r.setdefault("display_name", getattr(node, "display_name", None) or node.name)
+                r.setdefault("node_type", node.node_type)
+                r.setdefault("is_synthetic", getattr(node, "is_synthetic", True))
+                r.setdefault("data_source", getattr(node, "data_source", "synthetic"))
+                r.setdefault("name_source", getattr(node, "name_source", "synthetic"))
+                r.setdefault("data_quality", getattr(node, "data_quality", "verified"))
+            else:
+                r.setdefault("name", f"Node {str(r.get('node_id'))[:8]}")
+                r.setdefault("display_name", f"Node {str(r.get('node_id'))[:8]}")
+                r.setdefault("node_type", "unknown")
+                r.setdefault("is_synthetic", True)
+                r.setdefault("data_source", "synthetic")
+                r.setdefault("name_source", "synthetic")
+                r.setdefault("data_quality", "verified")
+
+    return results

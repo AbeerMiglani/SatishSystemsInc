@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import uuid
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal, Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import UUID4, BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -34,11 +36,40 @@ class AddEdgeModification(BaseModel):
             raise ValueError("scenario edge endpoints must differ")
         return self
 
+
+class UpgradeNodeModification(BaseModel):
+    type: Literal["upgrade_node"] = "upgrade_node"
+    node_id: UUID4
+    capacity: Optional[float] = Field(default=None, gt=0, le=1_000_000)
+    capacity_multiplier: Optional[float] = Field(default=None, gt=0, le=1_000_000)
+    capacity_add: Optional[float] = Field(default=None, ge=0, le=1_000_000)
+    failure_threshold: Optional[float] = Field(default=None, gt=0, le=1_000_000)
+    failure_threshold_add: Optional[float] = Field(default=None, ge=0, le=1_000_000)
+
+    @model_validator(mode="after")
+    def at_least_one_upgrade_field(self) -> "UpgradeNodeModification":
+        if (
+            self.capacity is None
+            and self.capacity_multiplier is None
+            and self.capacity_add is None
+            and self.failure_threshold is None
+            and self.failure_threshold_add is None
+        ):
+            raise ValueError("at least one upgrade attribute must be specified for upgrade_node")
+        return self
+
+
+ScenarioModification = Annotated[
+    Union[AddEdgeModification, UpgradeNodeModification],
+    Field(discriminator="type"),
+]
+
+
 class ScenarioCreate(BaseModel):
     network_id: UUID4
     name: str = Field(min_length=1, max_length=120)
     description: str | None = Field(default=None, max_length=2_000)
-    modifications: list[AddEdgeModification] = Field(
+    modifications: list[ScenarioModification] = Field(
         min_length=1, max_length=settings.max_scenario_modifications
     )
     initial_failures: list[UUID4] = Field(min_length=1, max_length=settings.max_initial_failures)
@@ -50,21 +81,24 @@ class ScenarioCreate(BaseModel):
             raise ValueError("initial_failures must not contain duplicates")
         return values
 
+
 class ScenarioResponse(BaseModel):
     id: UUID4
     network_id: UUID4
     name: str
     description: str | None
-    modifications: list[AddEdgeModification]
+    modifications: list[ScenarioModification]
     initial_failures: list[UUID4]
     cached_result_id: UUID4 | None
     created_at: datetime
     
     model_config = ConfigDict(from_attributes=True)
 
+
 class CompareResponse(BaseModel):
     baseline_result: SimulationResponse
     scenario_result: SimulationResponse
+
 
 @router.post("", response_model=ScenarioResponse)
 def create_scenario(
@@ -83,7 +117,20 @@ def create_scenario(
     }
     referenced_ids = {str(node_id) for node_id in req.initial_failures}
     for modification in req.modifications:
-        referenced_ids.update({str(modification.source), str(modification.target)})
+        if isinstance(modification, AddEdgeModification):
+            referenced_ids.update({str(modification.source), str(modification.target)})
+        elif isinstance(modification, UpgradeNodeModification):
+            referenced_ids.add(str(modification.node_id))
+        elif getattr(modification, "type", None) == "add_edge":
+            referenced_ids.update({str(modification.source), str(modification.target)})
+        elif getattr(modification, "type", None) == "upgrade_node":
+            referenced_ids.add(str(modification.node_id))
+        elif isinstance(modification, dict):
+            if modification.get("type") == "add_edge":
+                referenced_ids.update({str(modification["source"]), str(modification["target"])})
+            elif modification.get("type") == "upgrade_node":
+                referenced_ids.add(str(modification["node_id"]))
+
     if referenced_ids - known_ids:
         raise HTTPException(status_code=422, detail="Scenario references nodes outside this network")
 
@@ -91,7 +138,12 @@ def create_scenario(
         network_id=req.network_id,
         name=req.name,
         description=req.description,
-        modifications=[modification.model_dump(mode="json") for modification in req.modifications],
+        modifications=[
+            modification.model_dump(mode="json", exclude_none=True)
+            if hasattr(modification, "model_dump")
+            else modification
+            for modification in req.modifications
+        ],
         initial_failures=[str(uid) for uid in req.initial_failures]
     )
     db.add(scenario)
@@ -99,12 +151,14 @@ def create_scenario(
     db.refresh(scenario)
     return scenario
 
+
 @router.get("/{scenario_id}", response_model=ScenarioResponse)
 def get_scenario(scenario_id: uuid.UUID, db: Session = Depends(get_db)):
     scenario = db.query(Scenario).filter(Scenario.id == scenario_id).first()
     if not scenario:
         raise HTTPException(status_code=404, detail="Scenario not found")
     return scenario
+
 
 @router.get("/compare/{baseline_sim_id}/{scenario_id}", response_model=CompareResponse)
 def compare_scenarios(baseline_sim_id: uuid.UUID, scenario_id: uuid.UUID, db: Session = Depends(get_db)):

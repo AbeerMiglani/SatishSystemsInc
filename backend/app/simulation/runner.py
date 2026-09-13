@@ -1,6 +1,13 @@
+from __future__ import annotations
+
 import json
 import logging
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+try:
+    from datetime import UTC
+except ImportError:
+    UTC = timezone.utc
 
 import networkx as nx
 from celery import shared_task
@@ -10,8 +17,57 @@ from app.db.postgres import SessionLocal
 from app.db.redis import get_redis_client
 from app.models.network import Edge, Node, Scenario, SimulationResult
 from app.simulation.cascade import run_cascade
+from app.simulation.population import calculate_population_impact
 
 logger = logging.getLogger(__name__)
+
+
+def apply_scenario_modifications(
+    G: nx.DiGraph,
+    modifications: list[dict],
+) -> nx.DiGraph:
+    """
+    Applies polymorphic scenario modifications (add_edge and upgrade_node)
+    to a copy of the in-memory graph.
+    """
+    G_mod = G.copy()
+    for mod in modifications:
+        mod_type = mod.get("type")
+        if mod_type == "add_edge":
+            src = str(mod["source"])
+            tgt = str(mod["target"])
+            if src not in G_mod or tgt not in G_mod or src == tgt:
+                raise ValueError("scenario references invalid graph endpoints")
+            weight = float(mod.get("weight", 1.0))
+            capacity = float(mod.get("capacity", 100.0))
+            edge_type = mod.get("edge_type", "power_supply")
+            is_bi = bool(mod.get("is_bidirectional", False))
+
+            G_mod.add_edge(src, tgt, weight=weight, capacity=capacity, edge_type=edge_type)
+            if is_bi:
+                G_mod.add_edge(tgt, src, weight=weight, capacity=capacity, edge_type=edge_type)
+
+        elif mod_type == "upgrade_node":
+            nid = str(mod["node_id"])
+            if nid not in G_mod:
+                raise ValueError(f"scenario upgrade references unknown node {nid}")
+
+            if mod.get("capacity") is not None:
+                G_mod.nodes[nid]["capacity"] = float(mod["capacity"])
+            elif mod.get("capacity_multiplier") is not None:
+                G_mod.nodes[nid]["capacity"] *= float(mod["capacity_multiplier"])
+            elif mod.get("capacity_add") is not None:
+                G_mod.nodes[nid]["capacity"] += float(mod["capacity_add"])
+
+            if mod.get("failure_threshold") is not None:
+                G_mod.nodes[nid]["failure_threshold"] = float(mod["failure_threshold"])
+            elif mod.get("failure_threshold_add") is not None:
+                G_mod.nodes[nid]["failure_threshold"] += float(mod["failure_threshold_add"])
+
+        else:
+            raise ValueError(f"unsupported scenario modification type: {mod_type}")
+
+    return G_mod
 
 
 @shared_task(bind=True)
@@ -66,21 +122,7 @@ def run_simulation_task(
             if not scenario or str(scenario.network_id) != network_id:
                 raise ValueError("scenario does not belong to the simulation network")
             if scenario.modifications:
-                for mod in scenario.modifications:
-                    if mod.get("type") != "add_edge":
-                        raise ValueError("unsupported scenario modification")
-                    src = mod["source"]
-                    tgt = mod["target"]
-                    if src not in G or tgt not in G or src == tgt:
-                        raise ValueError("scenario references invalid graph endpoints")
-                    weight = mod["weight"]
-                    capacity = mod["capacity"]
-                    edge_type = mod["edge_type"]
-                    is_bidirectional = mod["is_bidirectional"]
-
-                    G.add_edge(src, tgt, weight=weight, capacity=capacity, edge_type=edge_type)
-                    if is_bidirectional:
-                        G.add_edge(tgt, src, weight=weight, capacity=capacity, edge_type=edge_type)
+                G = apply_scenario_modifications(G, scenario.modifications)
                             
         # Callback to publish waves to Redis
         def on_wave(wave_data):
@@ -94,12 +136,21 @@ def run_simulation_task(
             on_wave_completed=on_wave
         )
         
-        # 5. Save results to Postgres
+        # 5. Calculate population impact with municipal cap and overlap detection
+        all_failed_ids = set(initial_failures)
+        for w in waves:
+            all_failed_ids.update(w.get("failed_node_ids", []))
+        pop_impact = calculate_population_impact(all_failed_ids, G)
+
+        # 6. Save results to Postgres
         total_failed = sum(len(w['failed_node_ids']) for w in waves)
         
         sim.waves = waves
         sim.total_failed = total_failed
-        sim.population_affected_estimate = pop_affected
+        sim.population_affected_estimate = pop_impact["population_affected_estimate"]
+        sim.study_area_population_cap = pop_impact["study_area_population_cap"]
+        sim.is_population_capped = pop_impact["is_population_capped"]
+        sim.has_unresolved_overlap = pop_impact["has_unresolved_overlap"]
         sim.global_efficiency_before = eff_before
         sim.global_efficiency_after = eff_after
         sim.status = "completed"

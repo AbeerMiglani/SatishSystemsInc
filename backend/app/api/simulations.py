@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import logging
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import UUID4, BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.orm import Session
 
@@ -10,6 +12,7 @@ from app.config import settings
 from app.db.postgres import get_db
 from app.models.network import Network, Node, Scenario, SimulationResult
 from app.security import enforce_rate_limit, require_operator, require_viewer
+from app.services.recommendations import MitigationRecommendation, get_recommendations
 from app.simulation.runner import run_simulation_task
 
 router = APIRouter(
@@ -118,3 +121,33 @@ def get_simulation(sim_id: uuid.UUID, db: Session = Depends(get_db)):
     if not sim:
         raise HTTPException(status_code=404, detail="Simulation not found")
     return sim
+
+
+@router.get(
+    "/{sim_id}/recommendations",
+    response_model=list[MitigationRecommendation],
+    summary="Get Deterministic Mitigation Recommendations",
+    description=(
+        "Returns a deterministically ranked list of mitigation interventions for a completed simulation. "
+        "Each candidate is re-simulated in memory against the Motter-Lai cascade model to verify genuine failure "
+        "reduction, population protection, and efficiency gain. Every recommendation includes a ready-to-post "
+        "scenario_payload for 1-click execution in the UI."
+    ),
+)
+def get_simulation_recommendations(
+    sim_id: uuid.UUID,
+    limit: int = Query(default=10, ge=1, le=50, description="Max recommendations to return"),
+    db: Session = Depends(get_db),
+):
+    """Fetch mitigation recommendations for a completed simulation."""
+    sim = db.query(SimulationResult).filter(SimulationResult.id == sim_id).first()
+    if not sim:
+        raise HTTPException(status_code=404, detail="Simulation not found")
+
+    if sim.status != "completed":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Simulation status is '{sim.status}'. Recommendations are only available for completed simulations.",
+        )
+
+    return get_recommendations(simulation=sim, db=db, limit=limit)

@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-import app.models  # Ensure models are registered before create_tables
+from app import models as _models  # noqa: F401  # Ensure models are registered before create_tables
 from app.api.networks import router as networks_router
 from app.api.scenarios import router as scenarios_router
 from app.api.simulations import router as simulations_router
@@ -21,6 +21,7 @@ from app.db.postgres import verify_postgres_connection
 from app.db.redis import verify_redis_connection
 
 logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
