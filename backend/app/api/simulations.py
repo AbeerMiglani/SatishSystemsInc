@@ -114,6 +114,7 @@ def create_simulation(
     return sim
 
 
+
 @router.get("/{sim_id}", response_model=SimulationResponse)
 def get_simulation(sim_id: uuid.UUID, db: Session = Depends(get_db)):
     """Fetch the status and results of a simulation."""
