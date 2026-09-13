@@ -146,9 +146,8 @@ def run_simulation_task(
 
         # 6. Save results to Postgres
         total_failed = sum(len(w['failed_node_ids']) for w in waves)
-        population_affected = calculate_population_impact(cumulative_failed_ids, G)
         
-        sim.waves = enriched_waves
+        sim.waves = waves
         sim.total_failed = total_failed
         sim.population_affected_estimate = pop_impact["population_affected_estimate"]
         sim.study_area_population_cap = pop_impact["study_area_population_cap"]

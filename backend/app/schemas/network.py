@@ -5,7 +5,6 @@ from typing import Optional
 
 from pydantic import UUID4, BaseModel, ConfigDict, model_validator
 
-from pydantic import UUID4, BaseModel, ConfigDict
 
 
 class NodeBase(BaseModel):

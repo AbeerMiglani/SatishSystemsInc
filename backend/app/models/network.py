@@ -110,11 +110,6 @@ class Node(Base):
     edges_out = relationship("Edge", foreign_keys="Edge.source_id", back_populates="source")
     edges_in = relationship("Edge", foreign_keys="Edge.target_id", back_populates="target")
 
-    @property
-    def display_name(self) -> str:
-        """Stable human-readable label; UUID remains the canonical identifier."""
-        return self.display_name_value or self.name
-
 
 class Edge(Base):
     __tablename__ = "infra_edges"
