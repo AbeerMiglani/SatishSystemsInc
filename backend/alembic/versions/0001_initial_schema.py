@@ -17,12 +17,34 @@ branch_labels = None
 depends_on = None
 
 
-node_type = sa.Enum(
-    "power_substation", "water_station", "hospital", "road_junction", "telecom_tower", name="node_type_enum"
+# postgresql.ENUM (not the cross-dialect sa.Enum) below, with create_type=False
+# on every one: upgrade()/downgrade() create and drop these types explicitly
+# (see the loops further down). Without create_type=False, SQLAlchemy *also*
+# tries to auto-create each type when the table that uses it is created
+# (op.create_table's before_create DDL event, which Alembic runs with
+# checkfirst=False) — a second CREATE TYPE for a type the explicit loop
+# already created, which Postgres rejects as a duplicate; symmetrically for
+# DROP TYPE on downgrade. create_type is a postgresql.ENUM-only constructor
+# parameter — passing it to sa.Enum is silently ignored (no attribute is even
+# set), so the dialect-native type is required for this to have any effect.
+node_type = postgresql.ENUM(
+    "power_substation",
+    "water_station",
+    "hospital",
+    "road_junction",
+    "telecom_tower",
+    name="node_type_enum",
+    create_type=False,
 )
-node_status = sa.Enum("operational", "degraded", "failed", name="node_status_enum")
-edge_type = sa.Enum("power_supply", "water_supply", "road_link", "depends_on", name="edge_type_enum")
-simulation_status = sa.Enum("pending", "running", "completed", "failed", name="sim_status_enum")
+node_status = postgresql.ENUM(
+    "operational", "degraded", "failed", name="node_status_enum", create_type=False
+)
+edge_type = postgresql.ENUM(
+    "power_supply", "water_supply", "road_link", "depends_on", name="edge_type_enum", create_type=False
+)
+simulation_status = postgresql.ENUM(
+    "pending", "running", "completed", "failed", name="sim_status_enum", create_type=False
+)
 
 
 def upgrade() -> None:
