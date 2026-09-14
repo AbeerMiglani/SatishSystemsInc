@@ -41,6 +41,6 @@ def verify_redis_connection() -> bool:
     """Ping Redis to verify connectivity."""
     try:
         client = get_redis_client()
-        return client.ping()
+        return bool(client.ping())
     except Exception:
         return False

@@ -174,6 +174,13 @@ def run_simulation_task(
         
     except Exception:
         logger.exception("simulation %s failed", simulation_id)
+        # A failure in the final db.commit() above leaves the session's
+        # transaction in a state SQLAlchemy requires rolling back before any
+        # further query — without this, the recovery query below raises
+        # PendingRollbackError and the run is left stuck at status="running"
+        # instead of being marked "failed". Matches the pattern already used
+        # in app.services.ingestion's own except-then-rollback path.
+        db.rollback()
         sim = db.query(SimulationResult).filter(SimulationResult.id == simulation_id).first()
         if sim:
             sim.status = "failed"

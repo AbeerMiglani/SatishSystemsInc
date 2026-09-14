@@ -80,6 +80,17 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen("http://localhost:8000/health",
+        timeout=3)
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
   worker:
     build:
       context: ./backend
@@ -100,6 +111,14 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - celery -A app.celery_app inspect ping -d celery@$$HOSTNAME
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
   migrator:
     build:
       context: ./backend
@@ -147,7 +166,8 @@ services:
       # Inside the container the API is the `backend` service, not localhost.
       VITE_API_TARGET: http://backend:8000
     depends_on:
-    - backend
+      backend:
+        condition: service_healthy
 volumes:
   pgdata: null
   neo4jdata: null

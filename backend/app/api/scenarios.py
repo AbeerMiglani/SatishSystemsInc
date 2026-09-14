@@ -192,7 +192,10 @@ def compare_scenarios(baseline_sim_id: uuid.UUID, scenario_id: uuid.UUID, db: Se
     if scenario_sim.network_id != scenario.network_id:
         raise HTTPException(status_code=409, detail="Scenario cache references an invalid simulation")
         
+    # baseline_sim/scenario_sim are ORM rows, not SimulationResponse instances;
+    # CompareResponse's model_config sets from_attributes=True so pydantic
+    # coerces them at runtime. mypy can't see through that dynamic coercion.
     return CompareResponse(
-        baseline_result=baseline_sim,
-        scenario_result=scenario_sim
+        baseline_result=baseline_sim,  # type: ignore[arg-type]
+        scenario_result=scenario_sim,  # type: ignore[arg-type]
     )
