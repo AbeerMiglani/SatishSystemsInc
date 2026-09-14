@@ -13,7 +13,12 @@
  * vocabulary those inline styles pull from via var(--token).
  */
 
-@import url("https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap");
+/*
+ * The webfont is requested from index.html, not with an @import here: an
+ * @import inside a stylesheet that is itself imported from JS is not
+ * discovered until the bundle parses, which cost a flash of fallback text on
+ * every load.
+ */
 
 :root {
   /* Ground */
@@ -46,8 +51,28 @@
   --rp-divider: rgba(148, 188, 227, 0.18);
   --rp-divider-strong: rgba(148, 188, 227, 0.3);
 
-  --rp-font-heading: "Barlow Condensed", system-ui, sans-serif;
-  --rp-font-body: "Barlow", system-ui, sans-serif;
+  /*
+   * Typography. One family across headings, body and tabular figures: the
+   * previous pairing of a condensed face for headings with a separate body
+   * face made each panel read as its own document.
+   *
+   * --font-family-base is the canonical token. --rp-font-heading and
+   * --rp-font-body are retained as aliases so the existing var(--rp-font-*)
+   * call sites throughout the components keep working unchanged.
+   */
+  --font-family-base: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --rp-font-heading: var(--font-family-base);
+  --rp-font-body: var(--font-family-base);
+  /* Monospace was hardcoded at two call sites; it is a token now. */
+  --rp-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Type scale — every size in the app was previously a bare literal. */
+  --rp-text-xs: 10.5px;
+  --rp-text-sm: 11.5px;
+  --rp-text-md: 12.5px;
+  --rp-text-lg: 14px;
+  --rp-text-xl: 18px;
+  --rp-text-2xl: 27px;
 
   --rp-space-1: 4px;
   --rp-space-2: 8px;
@@ -72,7 +97,18 @@
 .rp-root h6 {
   font-family: var(--rp-font-heading);
   font-weight: 600;
+  /* Inter is a normal-width face where the previous heading font was
+     condensed, so headings are tracked in slightly to keep the same density. */
+  letter-spacing: -0.01em;
   margin: 0;
+}
+
+/* Figures the user compares column to column must not jitter as they animate. */
+.rp-root .rp-num,
+.rp-root table {
+  font-family: var(--font-family-base);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
 }
 
 /* — blueprint frame: a square, hairline-bordered wrapper with corner ticks — */

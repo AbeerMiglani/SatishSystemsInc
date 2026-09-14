@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import type { InfraNode, InfraEdge, CentralityScore, SimulationResult } from "../types";
+import type { CentralityScore, InfraEdge, InfraNode, MitigationRecommendation, SimulationResult } from "../types";
 
 // ---------------------------------------------------------------------------
 // Networks
@@ -122,5 +122,25 @@ export function useCompareScenarios(baselineSimId: string | null, scenarioId: st
       return res.json() as Promise<{ baseline_result: SimulationResult; scenario_result: SimulationResult }>;
     },
     enabled: !!baselineSimId && !!scenarioId,
+  });
+}
+
+/**
+ * Ranked mitigations for a completed simulation.
+ *
+ * Deliberately NOT named `useRecommendations`: a hook by that name was removed
+ * because it had no call sites and its return type contradicted the endpoint,
+ * and `test_frontend_contracts_p2.py` pins it as gone. This one is typed
+ * against what the endpoint actually returns — a bare list.
+ */
+export function useMitigations(simulationId: string | null | undefined, limit = 5) {
+  return useQuery<MitigationRecommendation[]>({
+    queryKey: ["mitigations", simulationId, limit],
+    enabled: !!simulationId,
+    queryFn: async () => {
+      const res = await fetch(`/api/simulations/${simulationId}/recommendations?limit=${limit}`);
+      if (!res.ok) throw new Error("Failed to fetch mitigations");
+      return res.json();
+    },
   });
 }

@@ -208,10 +208,12 @@ const ControlPanel: React.FC = () => {
                       fontSize: 11,
                       color: "#fca5a5",
                     }}
-                    title={`ID: ${id} | Source: ${nameSource} | Quality: ${dataQuality}`}
+                    // Plain-language only. The raw id, source and quality
+                    // are in ExplainPanel's asset-details drawer, where they
+                    // can be read deliberately rather than hovered into.
+                    title={`${name} — ${nameSource} data, ${dataQuality}`}
                   >
                     <span>{name}</span>
-                    <span style={{ fontSize: 9, padding: "0 3px", background: "var(--rp-surface-3)", color: "var(--rp-mute)" }}>{nameSource}</span>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -312,10 +314,13 @@ const ControlPanel: React.FC = () => {
             <strong style={{ color: "var(--rp-accent)" }}>{result.waves.length}</strong>
           </p>
           <p style={{ margin: "2px 0", fontSize: 12.5, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-            Pop affected: <strong style={{ color: "var(--rp-wave-2)" }}>{comparablePopulation(result).toLocaleString()}</strong>
+            People affected:{" "}
+            <strong style={{ color: "var(--rp-wave-2)" }}>
+              {(result.deduplicated_population_affected ?? comparablePopulation(result)).toLocaleString()}
+            </strong>
             {result.has_unresolved_overlap && (
-              <span title="Multiple utility failure areas overlap without parcel-level polygon data. Total is capped at the study-area limit.">
-                <ProvenanceTag kind="estimated" label="⚠ overlap" />
+              <span title="These assets carry no service geometry, so overlapping service areas could not be resolved and this total may count some residents more than once.">
+                <ProvenanceTag kind="estimated" label="⚠ overlap unresolved" />
               </span>
             )}
           </p>
