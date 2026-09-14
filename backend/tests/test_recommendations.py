@@ -11,179 +11,21 @@ Covers four mandatory cases:
 
 from __future__ import annotations
 
-import importlib.machinery
-import importlib.util
 import sys
 import uuid
 from pathlib import Path
-from types import ModuleType
-from unittest.mock import MagicMock
 
 import networkx as nx
 
 # Ensure backend directory is in sys.path
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 BACKEND_DIR = PROJECT_ROOT / "backend"
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-
-def _need_mock(name: str) -> bool:
-    if name in sys.modules:
-        mod = sys.modules[name]
-        if getattr(mod, "__spec__", None) is None:
-            mod.__spec__ = importlib.machinery.ModuleSpec(name, None)
-        return False
-    try:
-        spec = importlib.util.find_spec(name)
-        return spec is None
-    except (ValueError, ModuleNotFoundError):
-        return True
-
-
-def _make_mock_module(name: str) -> ModuleType:
-    if name in sys.modules:
-        mod = sys.modules[name]
-        if getattr(mod, "__spec__", None) is None:
-            mod.__spec__ = importlib.machinery.ModuleSpec(name, None)
-        return mod
-    mod = ModuleType(name)
-    mod.__spec__ = importlib.machinery.ModuleSpec(name, None)
-    sys.modules[name] = mod
-    return mod
-
-
-# Lightweight test shims if running in lean venv without full DB drivers
-if _need_mock("pydantic"):
-    pyd = _make_mock_module("pydantic")
-
-    class BaseModel:
-        def __init__(self, **kwargs):
-            for k, v in kwargs.items():
-                setattr(self, k, v)
-
-        def model_dump(self, mode=None, exclude_none=False):
-            res = {}
-            for k, v in self.__dict__.items():
-                if exclude_none and v is None:
-                    continue
-                res[k] = v
-            return res
-
-    pyd.BaseModel = BaseModel
-    pyd.Field = lambda *args, default=None, **kwargs: default
-    pyd.field_validator = lambda *fields, **kwargs: (lambda fn: fn)
-    pyd.model_validator = lambda *args, **kwargs: (lambda fn: fn)
-    pyd.ConfigDict = lambda **kw: kw
-    pyd.UUID4 = uuid.UUID
-
-
-if _need_mock("pydantic_settings"):
-    _make_mock_module("pydantic_settings")
-
-if _need_mock("fastapi"):
-    fa = _make_mock_module("fastapi")
-    class APIRouter:
-        def __init__(self, *args, **kwargs): pass
-        def post(self, *args, **kwargs):
-            def dec(fn): return fn
-            return dec
-        def get(self, *args, **kwargs):
-            def dec(fn): return fn
-            return dec
-    fa.APIRouter = APIRouter
-    fa.Depends = lambda x: x
-    fa.Query = lambda default=None, **kw: default
-    class HTTPException(Exception):
-        def __init__(self, status_code, detail=None):
-            self.status_code = status_code
-            self.detail = detail
-    fa.HTTPException = HTTPException
-
-
-if _need_mock("sqlalchemy"):
-    class MockColumn:
-        def __init__(self, *args, **kwargs):
-            self.default = kwargs.get("default")
-
-        def __set_name__(self, owner, name):
-            self.name = name
-
-        def __get__(self, instance, owner):
-            if instance is None:
-                return self
-            return instance.__dict__.get(
-                self.name,
-                self.default() if callable(self.default) else self.default,
-            )
-
-        def __set__(self, instance, value):
-            instance.__dict__[self.name] = value
-
-        def __eq__(self, other):
-            return MagicMock()
-
-    mock_sa = _make_mock_module("sqlalchemy")
-    mock_sa.Column = MockColumn
-    mock_sa.String = MagicMock()
-    mock_sa.Integer = MagicMock()
-    mock_sa.Float = MagicMock()
-    mock_sa.Boolean = MagicMock()
-    mock_sa.DateTime = MagicMock()
-    mock_sa.JSON = MagicMock()
-    mock_sa.Enum = MagicMock()
-    mock_sa.ForeignKey = MagicMock()
-    mock_sa.CheckConstraint = MagicMock()
-    mock_sa.UniqueConstraint = MagicMock()
-
-    mock_sa_orm = _make_mock_module("sqlalchemy.orm")
-    mock_sa_orm.relationship = MagicMock()
-    mock_sa_orm.validates = lambda *a: (lambda fn: fn)
-    mock_sa_orm.sessionmaker = MagicMock()
-    mock_sa_orm.Session = MagicMock()
-
-    class MockBase:
-        def __init__(self, **kwargs):
-            for k, v in kwargs.items():
-                setattr(self, k, v)
-
-    mock_sa_orm.DeclarativeBase = MockBase
-    mock_sa.orm = mock_sa_orm
-
-    mock_sa_dialects = _make_mock_module("sqlalchemy.dialects")
-    mock_sa_pg = _make_mock_module("sqlalchemy.dialects.postgresql")
-    mock_sa_pg.UUID = MagicMock()
-    mock_sa_dialects.postgresql = mock_sa_pg
-    mock_sa.dialects = mock_sa_dialects
-
-if _need_mock("geoalchemy2"):
-    mock_geo = _make_mock_module("geoalchemy2")
-    mock_geo.Geometry = MagicMock()
-
-if "app.db.postgres" not in sys.modules:
-    if "MockBase" not in globals():
-        from sqlalchemy.orm import DeclarativeBase
-
-        class MockBase(DeclarativeBase):
-            pass
-    mock_app_db_pg = _make_mock_module("app.db.postgres")
-    mock_app_db_pg.Base = MockBase
-    mock_app_db_pg.engine = MagicMock()
-    mock_app_db_pg.SessionLocal = MagicMock()
-    mock_app_db_pg.get_db = MagicMock()
-
-if "app.db.redis" not in sys.modules:
-    _make_mock_module("redis")
-    mock_redis_mod = _make_mock_module("app.db.redis")
-    mock_redis_mod.get_redis_client = MagicMock()
-
-if "app.security" not in sys.modules:
-    mock_sec = _make_mock_module("app.security")
-    mock_sec.enforce_rate_limit = MagicMock()
-    mock_sec.require_operator = MagicMock()
-    mock_sec.require_viewer = MagicMock()
-    mock_sec.require_admin = MagicMock()
+# Lean-environment module shims (sqlalchemy, pydantic, fastapi, ...) are
+# installed once for the whole suite by tests/conftest.py, before this file
+# is collected.
 
 from app.models.network import SimulationResult
 from app.services.recommendations import (

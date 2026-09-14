@@ -23,10 +23,9 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-# Reuse the shim environment so this runs without DB drivers installed.
-import tests.test_api_scenarios  # noqa: F401,E402  (installs module shims)
-
-from app.api.simulations import SimulationResponse  # noqa: E402
+# Lean-environment shims are installed once for the whole suite by
+# tests/conftest.py, before this file is collected.
+from app.api.simulations import SimulationResponse
 
 UTC = timezone.utc
 
