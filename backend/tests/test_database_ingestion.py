@@ -8,12 +8,10 @@ Verifies that:
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import sqlite3
 import sys
 from pathlib import Path
-from types import ModuleType
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -26,128 +24,9 @@ if str(BACKEND_DIR) not in sys.path:
 SEED_NODES_PATH = PROJECT_ROOT / "data" / "seed" / "nodes.geojson"
 SEED_EDGES_PATH = PROJECT_ROOT / "data" / "seed" / "edges.json"
 
-# Provide lightweight shims if running in a lean testing environment without PostgreSQL/Neo4j drivers
-if importlib.util.find_spec("neo4j") is None:
-    sys.modules["neo4j"] = MagicMock()
-
-if importlib.util.find_spec("pydantic") is None:
-    mock_app_db_neo = ModuleType("app.db.neo4j")
-    mock_app_db_neo.neo4j_session = MagicMock()
-    mock_app_db_neo.get_neo4j_driver = MagicMock()
-    mock_app_db_neo.close_neo4j_driver = MagicMock()
-    mock_app_db_neo.verify_neo4j_connection = MagicMock()
-    sys.modules["app.db.neo4j"] = mock_app_db_neo
-
-if (
-    importlib.util.find_spec("sqlalchemy") is None
-    or importlib.util.find_spec("geoalchemy2") is None
-):
-    class MockColumn:
-        def __init__(self, *args, **kwargs):
-            self.args = args
-            self.kwargs = kwargs
-            self.default = kwargs.get("default")
-
-        def __set_name__(self, owner, name):
-            self.name = name
-
-        def __get__(self, instance, owner):
-            if instance is None:
-                return self
-            return instance.__dict__.get(
-                self.name,
-                self.default() if callable(self.default) else self.default,
-            )
-
-        def __set__(self, instance, value):
-            instance.__dict__[self.name] = value
-
-    def mock_validates(*names):
-        def decorator(fn):
-            fn._sa_validates = names
-            return fn
-        return decorator
-
-    mock_sa = ModuleType("sqlalchemy")
-    mock_sa.Column = MockColumn
-    mock_sa.String = MagicMock()
-    mock_sa.Integer = MagicMock()
-    mock_sa.Float = MagicMock()
-    mock_sa.Boolean = MagicMock()
-    mock_sa.DateTime = MagicMock()
-    mock_sa.JSON = MagicMock()
-    mock_sa.Enum = MagicMock()
-    mock_sa.ForeignKey = MagicMock()
-    mock_sa.CheckConstraint = MagicMock()
-    mock_sa.UniqueConstraint = MagicMock()
-    mock_sa.create_engine = MagicMock()
-    mock_sa.text = MagicMock()
-
-    mock_sa_orm = ModuleType("sqlalchemy.orm")
-    mock_sa_orm.relationship = MagicMock()
-    mock_sa_orm.validates = mock_validates
-    mock_sa_orm.sessionmaker = MagicMock()
-    mock_sa_orm.Session = MagicMock()
-
-    class MockBase:
-        def __init__(self, **kwargs):
-            validators = {}
-            for attr in dir(self.__class__):
-                fn = getattr(self.__class__, attr)
-                if hasattr(fn, "_sa_validates"):
-                    for name in fn._sa_validates:
-                        validators[name] = getattr(self, attr)
-
-            for k, v in kwargs.items():
-                if k in validators:
-                    v = validators[k](k, v)
-                setattr(self, k, v)
-            self._sa_initialized = True
-
-        def __setattr__(self, name, value):
-            if getattr(self, "_sa_initialized", False):
-                for attr in dir(self.__class__):
-                    fn = getattr(self.__class__, attr)
-                    if hasattr(fn, "_sa_validates") and name in fn._sa_validates:
-                        value = getattr(self, attr)(name, value)
-            super().__setattr__(name, value)
-
-    mock_sa_orm.DeclarativeBase = MockBase
-    mock_sa.orm = mock_sa_orm
-
-    mock_sa_dialects = ModuleType("sqlalchemy.dialects")
-    mock_sa_pg = ModuleType("sqlalchemy.dialects.postgresql")
-    mock_sa_pg.UUID = MagicMock()
-    mock_sa_dialects.postgresql = mock_sa_pg
-    mock_sa.dialects = mock_sa_dialects
-
-    sys.modules["sqlalchemy"] = mock_sa
-    sys.modules["sqlalchemy.orm"] = mock_sa_orm
-
-if "app.db.postgres" not in sys.modules:
-    from sqlalchemy.orm import DeclarativeBase
-
-    class TestBase(DeclarativeBase):
-        pass
-
-    mock_app_db_pg = ModuleType("app.db.postgres")
-    mock_app_db_pg.Base = TestBase
-    mock_app_db_pg.engine = MagicMock()
-    mock_app_db_pg.SessionLocal = MagicMock()
-    mock_app_db_pg.get_db = MagicMock()
-    sys.modules["app.db.postgres"] = mock_app_db_pg
-    sys.modules["sqlalchemy.dialects"] = mock_sa_dialects
-    sys.modules["sqlalchemy.dialects.postgresql"] = mock_sa_pg
-
-    mock_geo = ModuleType("geoalchemy2")
-    mock_geo.Geometry = MagicMock()
-    sys.modules["geoalchemy2"] = mock_geo
-
-    mock_app_db_pg = ModuleType("app.db.postgres")
-    mock_app_db_pg.Base = MockBase
-    mock_app_db_pg.engine = MagicMock()
-    mock_app_db_pg.SessionLocal = MagicMock()
-    sys.modules["app.db.postgres"] = mock_app_db_pg
+# Lean-environment module shims (sqlalchemy, geoalchemy2, neo4j, ...) are
+# installed once for the whole suite by tests/conftest.py, before this file
+# is collected.
 
 from app.models.network import Node
 from app.services.graph_sync import sync_network_to_neo4j

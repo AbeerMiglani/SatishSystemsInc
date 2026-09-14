@@ -3,15 +3,17 @@ SQLAlchemy models for the Ripple backend.
 Uses GeoAlchemy2 for PostGIS geometries.
 """
 
+from __future__ import annotations
+
 import uuid
 from datetime import datetime, timezone
+from typing import Any
 
 from geoalchemy2 import Geometry
 from sqlalchemy import (
     JSON,
     Boolean,
     CheckConstraint,
-    Column,
     DateTime,
     Enum,
     Float,
@@ -21,7 +23,7 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-from sqlalchemy.orm import relationship, validates
+from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.db.postgres import Base
 
@@ -32,14 +34,16 @@ class Network(Base):
     __tablename__ = "networks"
     __table_args__ = (UniqueConstraint("name", name="uq_network_name"),)
 
-    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String, nullable=False)
-    description = Column(String, nullable=True)
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
+    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
 
-    nodes = relationship("Node", back_populates="network", cascade="all, delete-orphan")
-    edges = relationship("Edge", back_populates="network", cascade="all, delete-orphan")
-    scenarios = relationship("Scenario", back_populates="network")
+    nodes: Mapped[list[Node]] = relationship("Node", back_populates="network", cascade="all, delete-orphan")
+    edges: Mapped[list[Edge]] = relationship("Edge", back_populates="network", cascade="all, delete-orphan")
+    scenarios: Mapped[list[Scenario]] = relationship("Scenario", back_populates="network")
 
 
 class Node(Base):
@@ -53,12 +57,12 @@ class Node(Base):
         CheckConstraint("population_served >= 0", name="ck_node_population_nonnegative"),
     )
 
-    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    network_id = Column(
+    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    network_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("networks.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    name = Column(String, nullable=False)
-    node_type = Column(
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    node_type: Mapped[str] = mapped_column(
         Enum(
             "power_substation",
             "water_station",
@@ -70,28 +74,32 @@ class Node(Base):
         nullable=False,
     )
     # PostGIS geometry (Point, SRID 4326 for WGS84)
-    geom = Column(Geometry("POINT", srid=4326), nullable=False)
-    lat = Column(Float, nullable=False)
-    lng = Column(Float, nullable=False)
+    geom: Mapped[Any] = mapped_column(Geometry("POINT", srid=4326), nullable=False)
+    lat: Mapped[float] = mapped_column(Float, nullable=False)
+    lng: Mapped[float] = mapped_column(Float, nullable=False)
 
-    capacity = Column(Float, nullable=False, default=100.0)
-    current_load = Column(Float, nullable=False, default=0.0)
-    failure_threshold = Column(Float, nullable=False, default=1.0)
-    population_served = Column(Integer, nullable=False, default=0)
-    status = Column(
+    capacity: Mapped[float] = mapped_column(Float, nullable=False, default=100.0)
+    current_load: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    failure_threshold: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    population_served: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    status: Mapped[str] = mapped_column(
         Enum("operational", "degraded", "failed", name="node_status_enum"),
         default="operational",
         nullable=False,
     )
-    is_synthetic = Column(Boolean, nullable=False, default=True, server_default="true")
-    data_source = Column(String, nullable=False, default="synthetic", server_default="synthetic")
-    display_name = Column(String, nullable=False)
-    name_source = Column(String, nullable=False, default="synthetic", server_default="synthetic")
+    is_synthetic: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    data_source: Mapped[str] = mapped_column(String, nullable=False, default="synthetic", server_default="synthetic")
+    display_name: Mapped[str] = mapped_column(String, nullable=False)
+    name_source: Mapped[str] = mapped_column(
+        String, nullable=False, default="synthetic", server_default="synthetic"
+    )
     # Defaults to "estimated", not "verified": the shipped dataset is synthetic,
     # and this value is rendered to the user in the map tooltip, the criticality
     # panel and the selection chips. Only genuinely observed data may claim
     # "verified" (see data/seed/README.md for the provenance vocabulary).
-    data_quality = Column(String, nullable=False, default="estimated", server_default="estimated")
+    data_quality: Mapped[str] = mapped_column(
+        String, nullable=False, default="estimated", server_default="estimated"
+    )
 
     @validates("name")
     def sync_display_name_from_name(self, key, value):
@@ -105,10 +113,10 @@ class Node(Base):
             return self.name
         return value
 
-    network = relationship("Network", back_populates="nodes")
+    network: Mapped[Network] = relationship("Network", back_populates="nodes")
     # Relationships for edges where this node is source/target
-    edges_out = relationship("Edge", foreign_keys="Edge.source_id", back_populates="source")
-    edges_in = relationship("Edge", foreign_keys="Edge.target_id", back_populates="target")
+    edges_out: Mapped[list[Edge]] = relationship("Edge", foreign_keys="Edge.source_id", back_populates="source")
+    edges_in: Mapped[list[Edge]] = relationship("Edge", foreign_keys="Edge.target_id", back_populates="target")
 
 
 class Edge(Base):
@@ -120,82 +128,98 @@ class Edge(Base):
         UniqueConstraint("network_id", "source_id", "target_id", "edge_type", name="uq_network_edge"),
     )
 
-    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    network_id = Column(
+    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    network_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("networks.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    source_id = Column(PG_UUID(as_uuid=True), ForeignKey("nodes.id", ondelete="CASCADE"), nullable=False, index=True)
-    target_id = Column(PG_UUID(as_uuid=True), ForeignKey("nodes.id", ondelete="CASCADE"), nullable=False, index=True)
-    
-    edge_type = Column(
+    source_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("nodes.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    target_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("nodes.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+
+    edge_type: Mapped[str] = mapped_column(
         Enum("power_supply", "water_supply", "road_link", "depends_on", name="edge_type_enum"),
         nullable=False,
     )
-    weight = Column(Float, nullable=False, default=1.0)
-    capacity = Column(Float, nullable=False, default=100.0)
-    is_bidirectional = Column(Boolean, nullable=False, default=False)
+    weight: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    capacity: Mapped[float] = mapped_column(Float, nullable=False, default=100.0)
+    is_bidirectional: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
-    network = relationship("Network", back_populates="edges")
-    source = relationship("Node", foreign_keys=[source_id], back_populates="edges_out")
-    target = relationship("Node", foreign_keys=[target_id], back_populates="edges_in")
+    network: Mapped[Network] = relationship("Network", back_populates="edges")
+    source: Mapped[Node] = relationship("Node", foreign_keys=[source_id], back_populates="edges_out")
+    target: Mapped[Node] = relationship("Node", foreign_keys=[target_id], back_populates="edges_in")
 
 
 class Scenario(Base):
     __tablename__ = "scenarios"
 
-    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    network_id = Column(
+    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    network_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("networks.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    name = Column(String, nullable=False)
-    description = Column(String, nullable=True)
-    
-    # JSON list of dicts: {"type": "add_edge", "source": "uuid", "target": "uuid", ...}
-    modifications = Column(JSON, nullable=False, default=list)
-    # JSON list of initial failed node UUID strings
-    initial_failures = Column(JSON, nullable=False, default=list)
-    
-    cached_result_id = Column(PG_UUID(as_uuid=True), ForeignKey("simulation_results.id", ondelete="SET NULL"), nullable=True)
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str | None] = mapped_column(String, nullable=True)
 
-    network = relationship("Network", back_populates="scenarios")
-    result = relationship("SimulationResult", foreign_keys=[cached_result_id])
+    # JSON list of dicts: {"type": "add_edge", "source": "uuid", "target": "uuid", ...}
+    modifications: Mapped[list[Any]] = mapped_column(JSON, nullable=False, default=list)
+    # JSON list of initial failed node UUID strings
+    initial_failures: Mapped[list[Any]] = mapped_column(JSON, nullable=False, default=list)
+
+    cached_result_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("simulation_results.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+
+    network: Mapped[Network] = relationship("Network", back_populates="scenarios")
+    result: Mapped[SimulationResult | None] = relationship("SimulationResult", foreign_keys=[cached_result_id])
 
 
 class SimulationResult(Base):
     __tablename__ = "simulation_results"
 
-    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    network_id = Column(
+    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    network_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("networks.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    status = Column(
+    status: Mapped[str] = mapped_column(
         Enum("pending", "running", "completed", "failed", name="sim_status_enum"),
         nullable=False,
         default="pending",
     )
     # JSON list of initial failed node UUID strings
-    initial_failures = Column(JSON, nullable=False, default=list)
-    
+    initial_failures: Mapped[list[Any]] = mapped_column(JSON, nullable=False, default=list)
+
     # JSON list of dicts: [{"wave": 0, "failed_node_ids": ["uuid"]}, ...]
-    waves = Column(JSON, nullable=False, default=list)
-    
-    total_failed = Column(Integer, nullable=False, default=0)
-    population_affected_estimate = Column(Integer, nullable=False, default=0)
+    waves: Mapped[list[Any]] = mapped_column(JSON, nullable=False, default=list)
+
+    total_failed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    population_affected_estimate: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     # Uncapped sum. Kept alongside the capped estimate so a before/after
     # comparison stays meaningful when both runs saturate the study-area cap.
     # Nullable because rows written before this column existed have no recorded
     # raw value, and back-filling one would misrepresent those runs.
-    raw_population_affected = Column(Integer, nullable=True)
-    study_area_population_cap = Column(Integer, nullable=False, default=65000, server_default="65000")
-    is_population_capped = Column(Boolean, nullable=False, default=False, server_default="false")
-    has_unresolved_overlap = Column(Boolean, nullable=False, default=False, server_default="false")
+    raw_population_affected: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    study_area_population_cap: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=65000, server_default="65000"
+    )
+    is_population_capped: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    has_unresolved_overlap: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     # False when the cascade was truncated at the wave guardrail rather than
     # reaching a fixed point. A truncated run is still a valid bounded result.
-    cascade_stabilized = Column(Boolean, nullable=False, default=True, server_default="true")
-    global_efficiency_before = Column(Float, nullable=True)
-    global_efficiency_after = Column(Float, nullable=True)
-    
-    error_message = Column(String, nullable=True)
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False, index=True)
-    completed_at = Column(DateTime(timezone=True), nullable=True)
+    cascade_stabilized: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    global_efficiency_before: Mapped[float | None] = mapped_column(Float, nullable=True)
+    global_efficiency_after: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    error_message: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False, index=True
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
