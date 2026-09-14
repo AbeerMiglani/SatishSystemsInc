@@ -90,6 +90,8 @@ export interface SimulationResult {
   global_efficiency_before: number;
   global_efficiency_after: number;
   status: "pending" | "running" | "completed" | "failed";
+  /** Set by the backend when status is "failed"; null/absent otherwise. */
+  error_message?: string | null;
 }
 
 /**

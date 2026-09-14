@@ -1,28 +1,67 @@
 /**
- * RecommendationPanel — shows mitigation recommendations for a completed simulation
- * and allows users to apply them (creates scenario + re-simulates).
+ * RecommendationPanel — the rank-1 candidate gets the mockup's staged flow:
+ * "Review intervention" shows a draft compare (baseline vs. an *estimated*
+ * projection from the recommendation's own fields) with nothing sent to the
+ * API yet; "Run verified rerun" is what actually creates the scenario, runs
+ * the simulation, and polls it — the same request sequence the previous
+ * one-click "Apply" used, just deferred behind an explicit review step so
+ * the projected and measured numbers are never shown as the same thing.
  *
- * Visibly distinguishes:
- * - ⚡ Upgrade Node (blue badge) vs 🔗 Redundancy / Add Edge (green badge)
- * - 🏥 Protects Hospital / Critical Service (gold/amber badge)
- * - State registration into useSimulationStore and localStorage
+ * Lower-ranked candidates keep the original one-click apply — the mockup
+ * itself only stages the top candidate; alternatives are informational.
  */
-
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSimulationStore, StoredScenario } from "../stores/simulationStore";
-import type { MitigationRecommendation } from "../types";
+import { useUIStore } from "../stores/uiStore";
+import { useNetworkTopology } from "../api/hooks";
+import type { InfraNode, MitigationRecommendation, SimulationResult } from "../types";
+import { comparablePopulation } from "../types";
+import ProvenanceTag from "./shared/ProvenanceTag";
+import Banner from "./shared/Banner";
+import Section from "./shared/Section";
+
+function interventionLabel(rec: MitigationRecommendation, nodeLookup: Map<string, InfraNode>) {
+  const isAddEdge = rec.intervention_type === "add_edge";
+  const srcName = rec.display_name || rec.node_name || nodeLookup.get(rec.node_id)?.display_name || rec.node_id.slice(0, 8);
+  const tgtName = rec.target_display_name || rec.target_node_name || (rec.target_node_id ? `Node ${rec.target_node_id.slice(0, 8)}` : "");
+  return {
+    isAddEdge,
+    title: isAddEdge ? "Add redundancy link" : "Upgrade node capacity",
+    subject: isAddEdge ? `${srcName} ➔ ${tgtName}` : srcName,
+  };
+}
 
 export default function RecommendationPanel() {
   const result = useSimulationStore((s) => s.result);
+  const isRunning = useSimulationStore((s) => s.isRunning);
   const setSimulationResult = useSimulationStore((s) => s.setSimulationResult);
   const baselineSimulationId = useSimulationStore((s) => s.baselineSimulationId);
   const setBaselineSimulationId = useSimulationStore((s) => s.setBaselineSimulationId);
   const registerScenario = useSimulationStore((s) => s.registerScenario);
   const setLastAppliedScenarioId = useSimulationStore((s) => s.setLastAppliedScenarioId);
   const addSimulation = useSimulationStore((s) => s.addSimulation);
+  const networkId = useUIStore((s) => s.networkId);
+  const { data: topology } = useNetworkTopology(networkId);
 
-  // Track which recommendations have been applied (by rank)
+  const nodeLookup = new Map<string, InfraNode>((topology?.nodes ?? []).map((n) => [n.id, n]));
+
+  // Rank-1 staged review state. Snapshotting the recommendation + baseline at
+  // the moment review starts (rather than re-reading the live `result` /
+  // `recommendations` throughout) matters: once the verified rerun completes,
+  // setSimulationResult swaps the store's active `result` over to the
+  // scenario's own result, and the recommendations query then refetches for
+  // *that* id — both would otherwise pull the rug out from under a compare
+  // table that's supposed to keep showing the same before/after the whole
+  // time.
+  const [reviewSnapshot, setReviewSnapshot] = useState<{ rec: MitigationRecommendation; baseline: SimulationResult } | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [verified, setVerified] = useState<{ baseline: SimulationResult; scenario: SimulationResult } | null>(null);
+  const [showAlts, setShowAlts] = useState(false);
+  const reviewing = !!reviewSnapshot;
+
+  // Lower-rank one-click apply state (unchanged behaviour).
   const [applied, setApplied] = useState<Set<number>>(new Set());
   const [applying, setApplying] = useState<Set<number>>(new Set());
   const [applyErrors, setApplyErrors] = useState<Map<number, string>>(new Map());
@@ -37,91 +76,96 @@ export default function RecommendationPanel() {
     enabled: result?.status === "completed",
   });
 
-  if (!result || result.status !== "completed") return null;
+  const runInterventionSequence = async (rec: MitigationRecommendation, baseline: SimulationResult) => {
+    // Ensure baselineSimulationId is saved before running the what-if scenario.
+    if (!baselineSimulationId) setBaselineSimulationId(baseline.id);
+
+    const scenarioRes = await fetch("/api/scenarios", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(rec.scenario_payload),
+    });
+    if (!scenarioRes.ok) throw new Error("Failed to create scenario");
+    const scenario = await scenarioRes.json();
+
+    const entry: StoredScenario = {
+      id: scenario.id,
+      name: scenario.name,
+      network_id: scenario.network_id,
+      initial_failures: scenario.initial_failures,
+      intervention_type: rec.intervention_type,
+      created_at: scenario.created_at ?? new Date().toISOString(),
+    };
+    registerScenario(entry);
+    setLastAppliedScenarioId(scenario.id);
+
+    const simRes = await fetch("/api/simulations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        network_id: rec.scenario_payload.network_id,
+        initial_failures: rec.scenario_payload.initial_failures,
+        scenario_id: scenario.id,
+      }),
+    });
+    if (!simRes.ok) throw new Error("Failed to start simulation");
+    const simData = await simRes.json();
+
+    const simId = simData.id;
+    for (let attempt = 0; attempt < 30; attempt++) {
+      await new Promise((r) => setTimeout(r, 2000));
+      const pollRes = await fetch(`/api/simulations/${simId}`);
+      if (!pollRes.ok) throw new Error("Failed to poll simulation");
+      const pollData = (await pollRes.json()) as SimulationResult;
+      if (pollData.status === "completed" || pollData.status === "failed") {
+        if (pollData.status === "failed") throw new Error(pollData.error_message || "Re-simulation failed.");
+        addSimulation(
+          {
+            id: pollData.id,
+            network_id: pollData.network_id,
+            initial_failures: pollData.initial_failures,
+            total_failed: pollData.total_failed,
+            is_baseline: false,
+            scenario_id: scenario.id,
+            created_at: new Date().toISOString(),
+          },
+          false
+        );
+        return pollData;
+      }
+    }
+    throw new Error("Re-simulation timed out after 60 s.");
+  };
+
+  const handleRunVerifiedRerun = async () => {
+    if (!reviewSnapshot) return;
+    setVerifying(true);
+    setVerifyError(null);
+    try {
+      const pollData = await runInterventionSequence(reviewSnapshot.rec, reviewSnapshot.baseline);
+      setVerified({ baseline: reviewSnapshot.baseline, scenario: pollData });
+      setSimulationResult(pollData);
+    } catch (err) {
+      setVerifyError(err instanceof Error ? err.message : "Unknown error running the verified rerun.");
+    } finally {
+      setVerifying(false);
+    }
+  };
 
   const handleApply = async (rec: MitigationRecommendation) => {
+    if (!result) return;
     setApplying((prev) => new Set(prev).add(rec.rank));
     setApplyErrors((prev) => {
       const m = new Map(prev);
       m.delete(rec.rank);
       return m;
     });
-
     try {
-      // Ensure baselineSimulationId is saved before running what-if scenario
-      if (result && !baselineSimulationId) {
-        setBaselineSimulationId(result.id);
-      }
-
-      // Step a: POST to /api/scenarios with scenario_payload
-      const scenarioRes = await fetch("/api/scenarios", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(rec.scenario_payload),
-      });
-      if (!scenarioRes.ok) throw new Error("Failed to create scenario");
-      const scenario = await scenarioRes.json();
-
-      // Step b: Register scenario in Zustand store and persist to localStorage
-      const entry: StoredScenario = {
-        id: scenario.id,
-        name: scenario.name,
-        network_id: scenario.network_id,
-        initial_failures: scenario.initial_failures,
-        intervention_type: rec.intervention_type,
-        created_at: scenario.created_at ?? new Date().toISOString(),
-      };
-      registerScenario(entry);
-      setLastAppliedScenarioId(scenario.id);
-
-      // Step c: POST to /api/simulations
-      const simRes = await fetch("/api/simulations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          network_id: rec.scenario_payload.network_id,
-          initial_failures: rec.scenario_payload.initial_failures,
-          scenario_id: scenario.id,
-        }),
-      });
-      if (!simRes.ok) throw new Error("Failed to start simulation");
-      const simData = await simRes.json();
-
-      // Step d: Poll until completed/failed (max 30 attempts = ~60 s)
-      const simId = simData.id;
-      let settled = false;
-      for (let attempt = 0; attempt < 30; attempt++) {
-        await new Promise((r) => setTimeout(r, 2000));
-        const pollRes = await fetch(`/api/simulations/${simId}`);
-        if (!pollRes.ok) throw new Error("Failed to poll simulation");
-        const pollData = await pollRes.json();
-        if (pollData.status === "completed" || pollData.status === "failed") {
-          if (pollData.status === "failed") {
-            throw new Error("Re-simulation failed — check server logs for details.");
-          }
-          addSimulation(
-            {
-              id: pollData.id,
-              network_id: pollData.network_id,
-              initial_failures: pollData.initial_failures,
-              total_failed: pollData.total_failed,
-              is_baseline: false,
-              scenario_id: scenario.id,
-              created_at: new Date().toISOString(),
-            },
-            false
-          );
-          setSimulationResult(pollData);
-          settled = true;
-          break;
-        }
-      }
-      if (!settled) throw new Error("Re-simulation timed out after 60 s.");
-
+      const pollData = await runInterventionSequence(rec, result);
+      setSimulationResult(pollData);
       setApplied((prev) => new Set(prev).add(rec.rank));
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unknown error applying recommendation.";
-      setApplyErrors((prev) => new Map(prev).set(rec.rank, msg));
+      setApplyErrors((prev) => new Map(prev).set(rec.rank, err instanceof Error ? err.message : "Unknown error."));
     } finally {
       setApplying((prev) => {
         const next = new Set(prev);
@@ -131,204 +175,259 @@ export default function RecommendationPanel() {
     }
   };
 
+  if (!result || result.status !== "completed") {
+    return (
+      <Section title="Recommendation" state={isRunning ? "Generating" : "Unavailable"}>
+        <div style={{ padding: 16, border: "1px dashed var(--rp-divider-strong)", display: "flex", flexDirection: "column", gap: 6, textAlign: "center" }}>
+          <span style={{ fontFamily: "var(--rp-font-heading)", fontWeight: 600, fontSize: 14, color: "var(--rp-mute)" }}>
+            {isRunning ? "Generating recommendations" : "No recommendation yet"}
+          </span>
+          <span style={{ fontSize: 11.5, color: "var(--rp-dim)", lineHeight: 1.5 }}>
+            {isRunning
+              ? "Candidates are resimulated once the baseline cascade settles."
+              : "Run a simulation to generate ranked, resimulated interventions."}
+          </span>
+        </div>
+      </Section>
+    );
+  }
+
+  const top = recommendations?.[0];
+  const alts = recommendations?.slice(1) ?? [];
+
   return (
-    <div
-      style={{
-        borderTop: "1px solid #334155",
-        padding: "12px 16px",
-        background: "#0f172a",
-      }}
+    <Section
+      title="Recommendation"
+      state={recommendations ? (reviewing ? "In review" : `Rank 1 of ${recommendations.length}`) : isLoading ? "Loading" : "Unavailable"}
     >
-      <div
-        style={{
-          fontWeight: 700,
-          fontSize: 13,
-          color: "#94a3b8",
-          textTransform: "uppercase",
-          letterSpacing: "0.05em",
-          marginBottom: 10,
-        }}
-      >
-        🛡️ Mitigation Recommendations
-      </div>
+      {isLoading && <div style={{ color: "var(--rp-mute)", fontSize: 13 }}>Loading recommendations…</div>}
+      {isError && <div style={{ color: "var(--rp-wave-0)", fontSize: 13 }}>Failed to load recommendations.</div>}
+      {recommendations && recommendations.length === 0 && <div style={{ color: "var(--rp-mute)", fontSize: 13 }}>No recommendations available.</div>}
 
-      {isLoading && (
-        <div style={{ color: "#64748b", fontSize: 13 }}>Loading recommendations…</div>
-      )}
+      {(top || reviewSnapshot) && (() => {
+        // Frozen once review starts — see the reviewSnapshot state comment.
+        // The outer guard checks `top || reviewSnapshot`, not just `top`,
+        // because verifying changes the active result's id, which re-keys
+        // the recommendations query — `top` can go briefly (or permanently,
+        // if the improved network has nothing left to recommend) undefined
+        // while a review/verification is in progress. Falling back to the
+        // snapshot keeps the card (and a completed "Verified" state) mounted
+        // through that refetch instead of vanishing mid-review.
+        const activeRec = reviewSnapshot?.rec ?? top;
+        const activeBaseline = reviewSnapshot?.baseline ?? result;
+        if (!activeRec || !activeBaseline) return null;
+        const { title, subject } = interventionLabel(activeRec, nodeLookup);
+        const baselinePop = comparablePopulation(activeBaseline);
+        const projectedFailed = activeBaseline.total_failed - activeRec.failures_prevented;
+        const projectedPop = baselinePop - activeRec.raw_population_saved;
 
-      {isError && (
-        <div style={{ color: "#ef4444", fontSize: 13 }}>Failed to load recommendations.</div>
-      )}
-
-      {recommendations && recommendations.length === 0 && (
-        <div style={{ color: "#64748b", fontSize: 13 }}>No recommendations available.</div>
-      )}
-
-      {recommendations &&
-        recommendations.map((rec) => {
-          const isAddEdge = rec.intervention_type === "add_edge";
-          const srcName = rec.display_name || rec.node_name;
-          const tgtName =
-            rec.target_display_name ||
-            rec.target_node_name ||
-            (rec.target_node_id ? `Node ${rec.target_node_id.slice(0, 8)}` : "");
-          const displayName = isAddEdge ? `${srcName} ➔ ${tgtName}` : srcName;
-
-          const isApplied = applied.has(rec.rank);
-          const isApplying = applying.has(rec.rank);
-          const applyError = applyErrors.get(rec.rank);
-
-          const buttonLabel = isApplied
-            ? "✓ Applied"
-            : isApplying
-            ? "…"
-            : isAddEdge
-            ? "Apply Redundancy Scenario"
-            : "Apply Upgrade Scenario";
-
-          return (
-            <div
-              key={rec.rank}
-              style={{
-                background: "#1e293b",
-                border: "1px solid #334155",
-                borderRadius: 6,
-                padding: "10px 12px",
-                marginBottom: 8,
-              }}
-            >
-              {/* Badges container */}
-              <div
-                style={{
-                  display: "flex",
-                  gap: 6,
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                  marginBottom: 6,
-                }}
-              >
-                {isAddEdge ? (
-                  <span
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 600,
-                      padding: "2px 6px",
-                      borderRadius: 4,
-                      background: "#14532d",
-                      border: "1px solid #22c55e",
-                      color: "#86efac",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 3,
-                    }}
-                  >
-                    🔗 Redundancy / Add Edge
-                  </span>
-                ) : (
-                  <span
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 600,
-                      padding: "2px 6px",
-                      borderRadius: 4,
-                      background: "#1e3a8a",
-                      border: "1px solid #3b82f6",
-                      color: "#93c5fd",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 3,
-                    }}
-                  >
-                    ⚡ Upgrade Node
-                  </span>
+        return (
+          <div className="rp-blueprint" style={{ padding: 13, display: "flex", flexDirection: "column", gap: 10, background: "var(--rp-surface-3)" }}>
+            <i className="rp-corner tl" />
+            <i className="rp-corner tr" />
+            <i className="rp-corner bl" />
+            <i className="rp-corner br" />
+            <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase", padding: "2px 7px", background: "var(--rp-accent)", color: "#0b0f14", fontWeight: 500 }}>
+                Rank 1
+              </span>
+              <ProvenanceTag kind="verified" label="Verified by resimulation" />
+              {activeRec.protects_critical_services && <ProvenanceTag kind="estimated" label="Protects hospital" />}
+            </div>
+            <div>
+              <h4 style={{ fontSize: 19, marginBottom: 3 }}>{title}</h4>
+              <p style={{ margin: 0, fontSize: 12.5, color: "var(--rp-text-dim)", lineHeight: 1.5 }}>
+                {activeRec.intervention_type === "add_edge" ? "Add a redundancy link: " : "Harden "}
+                <strong style={{ color: "var(--rp-text)" }}>{subject}</strong>
+                {activeRec.proposed_capacity != null && (
+                  <>
+                    {" "}
+                    — capacity <span style={{ fontVariantNumeric: "tabular-nums" }}>→ {activeRec.proposed_capacity.toFixed(1)}</span>
+                  </>
                 )}
+                .
+              </p>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1, background: "var(--rp-divider)" }}>
+              <div style={{ padding: "9px 10px", background: "var(--rp-surface-3)", display: "flex", flexDirection: "column", gap: 2 }}>
+                <span style={{ fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--rp-mute)" }}>Failures prevented</span>
+                <span style={{ fontFamily: "var(--rp-font-heading)", fontWeight: 600, fontSize: 24, color: "var(--rp-teal-bright)", fontVariantNumeric: "tabular-nums" }}>
+                  −{activeRec.failures_prevented}
+                </span>
+                <ProvenanceTag kind="verified" />
+              </div>
+              <div style={{ padding: "9px 10px", background: "var(--rp-surface-3)", display: "flex", flexDirection: "column", gap: 2 }}>
+                <span style={{ fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--rp-mute)" }}>Population saved</span>
+                <span style={{ fontFamily: "var(--rp-font-heading)", fontWeight: 600, fontSize: 24, color: "var(--rp-teal-bright)", fontVariantNumeric: "tabular-nums" }}>
+                  {activeRec.raw_population_saved.toLocaleString()}
+                </span>
+                <ProvenanceTag kind="estimated" label="Estimated · uncapped" />
+              </div>
+            </div>
+            <Banner tone="success">
+              Evaluated by in-memory Motter–Lai resimulation, not a heuristic estimate. Efficiency gain{" "}
+              {(activeRec.efficiency_gain * 100).toFixed(1)}%.
+            </Banner>
 
-                {rec.protects_critical_services && (
-                  <span
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      padding: "2px 8px",
-                      borderRadius: 4,
-                      background: "linear-gradient(135deg, #b45309, #d97706)",
-                      border: "1px solid #f59e0b",
-                      color: "#ffffff",
-                      boxShadow: "0 0 6px rgba(245, 158, 11, 0.4)",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 3,
-                    }}
-                  >
-                    🏥 Protects Hospital / Critical Service
-                  </span>
+            {!reviewing && !verified && (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button className="rp-btn rp-btn-primary" style={{ flex: "1 1 150px" }} onClick={() => setReviewSnapshot({ rec: activeRec, baseline: activeBaseline })}>
+                  Review intervention
+                </button>
+                {alts.length > 0 && (
+                  <button className="rp-btn rp-btn-secondary" onClick={() => setShowAlts((v) => !v)}>
+                    View alternatives ({alts.length})
+                  </button>
                 )}
               </div>
+            )}
 
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                }}
-              >
-                <div style={{ flex: 1, minWidth: 0 }}>
+            {(reviewing || verified) && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 2 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "minmax(90px,1.2fr) repeat(3, minmax(60px,1fr))", gap: 1, background: "var(--rp-divider)" }}>
+                  <div style={{ background: "var(--rp-surface-2)", padding: "7px 9px", fontSize: 9.5, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--rp-dim)" }}>
+                    Metric
+                  </div>
+                  <div style={{ background: "var(--rp-surface-2)", padding: "7px 9px" }}>
+                    <div style={{ fontFamily: "var(--rp-font-heading)", fontWeight: 600, fontSize: 12 }}>Baseline</div>
+                    <ProvenanceTag kind="simulated" />
+                  </div>
+                  <div style={{ background: "var(--rp-surface-2)", padding: "7px 9px" }}>
+                    <div style={{ fontFamily: "var(--rp-font-heading)", fontWeight: 600, fontSize: 12 }}>Proposed</div>
+                    <ProvenanceTag kind="estimated" />
+                  </div>
                   <div
                     style={{
-                      fontWeight: 600,
-                      fontSize: 13,
-                      color: "#e2e8f0",
-                      marginBottom: 4,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
+                      background: verified ? "rgba(79,174,131,.12)" : "var(--rp-surface-2)",
+                      padding: "7px 9px",
+                      borderLeft: `1px solid ${verified ? "rgba(79,174,131,.4)" : "var(--rp-divider)"}`,
                     }}
                   >
-                    <span style={{ color: "#3b82f6", marginRight: 6 }}>#{rec.rank}</span>
-                    {displayName}
+                    <div style={{ fontFamily: "var(--rp-font-heading)", fontWeight: 600, fontSize: 12, color: verified ? "var(--rp-teal-bright)" : "var(--rp-mute)" }}>
+                      Verified rerun
+                    </div>
+                    <ProvenanceTag kind={verified ? "verified" : "muted"} label={verified ? "Verified" : "Pending"} />
                   </div>
-                  <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.6 }}>
-                    <span style={{ color: "#f87171" }}>Failures prevented: </span>
-                    <strong style={{ color: "#e2e8f0" }}>{rec.failures_prevented}</strong>
-                    <span style={{ margin: "0 6px", color: "#475569" }}>·</span>
-                    <span style={{ color: "#4ade80" }}>Pop. saved: </span>
-                    <strong style={{ color: "#e2e8f0" }}>
-                      {rec.raw_population_saved.toLocaleString()}
-                    </strong>
-                    <span style={{ margin: "0 6px", color: "#475569" }}>·</span>
-                    <span style={{ color: "#facc15" }}>Efficiency ↑ </span>
-                    <strong style={{ color: "#e2e8f0" }}>
-                      {(rec.efficiency_gain * 100).toFixed(1)}%
-                    </strong>
+
+                  <div style={{ background: "var(--rp-surface-3)", padding: "8px 9px", fontSize: 11.5, color: "var(--rp-text-dim)" }}>Failed assets</div>
+                  <div style={{ background: "var(--rp-surface-3)", padding: "8px 9px", fontFamily: "var(--rp-font-heading)", fontWeight: 600, fontSize: 15, fontVariantNumeric: "tabular-nums" }}>
+                    {activeBaseline.total_failed}
+                  </div>
+                  <div style={{ background: "var(--rp-surface-3)", padding: "8px 9px", fontFamily: "var(--rp-font-heading)", fontWeight: 600, fontSize: 15, fontVariantNumeric: "tabular-nums", color: "var(--rp-wave-2)" }}>
+                    {projectedFailed}
+                  </div>
+                  <div
+                    style={{
+                      background: verified ? "rgba(79,174,131,.09)" : "var(--rp-surface-3)",
+                      padding: "8px 9px",
+                      fontFamily: "var(--rp-font-heading)",
+                      fontWeight: 600,
+                      fontSize: 15,
+                      fontVariantNumeric: "tabular-nums",
+                      color: verified ? "var(--rp-teal-bright)" : "var(--rp-mute)",
+                      borderLeft: `1px solid ${verified ? "rgba(79,174,131,.4)" : "var(--rp-divider)"}`,
+                    }}
+                  >
+                    {verified ? verified.scenario.total_failed : "pending"}
+                  </div>
+
+                  <div style={{ background: "var(--rp-surface-3)", padding: "8px 9px", fontSize: 11.5, color: "var(--rp-text-dim)" }}>Population (uncapped)</div>
+                  <div style={{ background: "var(--rp-surface-3)", padding: "8px 9px", fontFamily: "var(--rp-font-heading)", fontWeight: 600, fontSize: 15, fontVariantNumeric: "tabular-nums" }}>
+                    {baselinePop.toLocaleString()}
+                  </div>
+                  <div style={{ background: "var(--rp-surface-3)", padding: "8px 9px", fontFamily: "var(--rp-font-heading)", fontWeight: 600, fontSize: 15, fontVariantNumeric: "tabular-nums", color: "var(--rp-wave-2)" }}>
+                    {projectedPop.toLocaleString()}
+                  </div>
+                  <div
+                    style={{
+                      background: verified ? "rgba(79,174,131,.09)" : "var(--rp-surface-3)",
+                      padding: "8px 9px",
+                      fontFamily: "var(--rp-font-heading)",
+                      fontWeight: 600,
+                      fontSize: 15,
+                      fontVariantNumeric: "tabular-nums",
+                      color: verified ? "var(--rp-teal-bright)" : "var(--rp-mute)",
+                      borderLeft: `1px solid ${verified ? "rgba(79,174,131,.4)" : "var(--rp-divider)"}`,
+                    }}
+                  >
+                    {verified ? comparablePopulation(verified.scenario).toLocaleString() : "pending"}
                   </div>
                 </div>
-                <button
-                  onClick={() => handleApply(rec)}
-                  disabled={isApplied || isApplying}
-                  style={{
-                    marginLeft: 10,
-                    padding: "6px 12px",
-                    fontSize: 12,
-                    fontWeight: 500,
-                    borderRadius: 4,
-                    border: "none",
-                    cursor: isApplied || isApplying ? "not-allowed" : "pointer",
-                    background: isApplied ? "#166534" : isApplying ? "#1e293b" : isAddEdge ? "#15803d" : "#2563eb",
-                    color: isApplied ? "#4ade80" : "#e2e8f0",
-                    whiteSpace: "nowrap",
-                    flexShrink: 0,
-                  }}
-                >
-                  {buttonLabel}
-                </button>
+
+                {!verified && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "9px 10px", border: "1px solid var(--rp-divider)", background: "var(--rp-surface-3)" }}>
+                    <span style={{ fontSize: 11.5, color: "var(--rp-text-dim)", lineHeight: 1.5, flex: "1 1 220px" }}>
+                      The proposed column is a projection. Nothing is claimed as fact until the deterministic engine
+                      reruns the cascade on the modified network.
+                    </span>
+                    <button className="rp-btn rp-btn-primary" onClick={handleRunVerifiedRerun} disabled={verifying}>
+                      {verifying ? "Running…" : "Run verified rerun"}
+                    </button>
+                    <button className="rp-btn rp-btn-secondary" onClick={() => setReviewSnapshot(null)} disabled={verifying}>
+                      Discard draft
+                    </button>
+                  </div>
+                )}
+                {verified && (
+                  <Banner tone="success">
+                    <strong style={{ color: "var(--rp-teal-bright)" }}>Measured, not projected.</strong> The verified column
+                    is the engine's own result for the modified graph — same seed, same initial failure,{" "}
+                    {verified.scenario.total_failed} assets failed against a baseline of {verified.baseline.total_failed}.
+                  </Banner>
+                )}
+                {verifyError && (
+                  <Banner tone="error" action={<button className="rp-btn rp-btn-secondary" onClick={handleRunVerifiedRerun}>Retry</button>}>
+                    {verifyError}
+                  </Banner>
+                )}
               </div>
-              {applyError && (
-                <div style={{ marginTop: 6, fontSize: 11, color: "#f87171" }}>
-                  ⚠️ {applyError}
-                </div>
-              )}
-            </div>
-          );
-        })}
-    </div>
+            )}
+
+            {showAlts && alts.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 1, background: "rgba(148,188,227,.12)", marginTop: 2 }}>
+                {alts.map((a) => {
+                  const isApplied = applied.has(a.rank);
+                  const isApplying = applying.has(a.rank);
+                  const label = interventionLabel(a, nodeLookup);
+                  return (
+                    <div key={a.rank} style={{ display: "flex", flexDirection: "column", gap: 6, padding: "8px 10px", background: "var(--rp-surface-3)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={{ fontFamily: "var(--rp-font-heading)", fontWeight: 600, fontSize: 12, color: "var(--rp-faint)" }}>#{a.rank}</span>
+                        <span style={{ display: "flex", flexDirection: "column", gap: 1, flex: 1, minWidth: 0 }}>
+                          <span style={{ fontSize: 12, color: "var(--rp-text)" }}>{label.title}</span>
+                          <span style={{ fontSize: 10.5, color: "var(--rp-mute)" }}>{label.subject}</span>
+                        </span>
+                        <span style={{ textAlign: "right", fontSize: 10.5, color: "var(--rp-mute)", fontVariantNumeric: "tabular-nums", lineHeight: 1.4 }}>
+                          −{a.failures_prevented} failures
+                          <br />
+                          {a.raw_population_saved.toLocaleString()} pop
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                        <button
+                          className="rp-btn rp-btn-secondary"
+                          style={{ fontSize: 11 }}
+                          onClick={() => handleApply(a)}
+                          disabled={isApplied || isApplying}
+                        >
+                          {isApplied ? "✓ Applied" : isApplying ? "…" : "Apply"}
+                        </button>
+                      </div>
+                      {applyErrors.get(a.rank) && (
+                        <div style={{ fontSize: 11, color: "var(--rp-wave-0)" }}>⚠ {applyErrors.get(a.rank)}</div>
+                      )}
+                    </div>
+                  );
+                })}
+                <p style={{ margin: 0, padding: "7px 10px", background: "var(--rp-surface-3)", fontSize: 10.5, color: "var(--rp-faint)", lineHeight: 1.45 }}>
+                  Ranked on failures prevented first; hospital protection breaks ties within a tier — a larger population
+                  figure alone does not outrank.
+                </p>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+    </Section>
   );
 }

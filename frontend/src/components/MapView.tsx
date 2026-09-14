@@ -1,23 +1,36 @@
 /**
  * MapView — MapLibre GL JS basemap + deck.gl overlay layers.
  *
- * Renders infrastructure nodes as colored circles and edges as lines.
- * Failed nodes pulse red during cascade animation.
+ * Renders infrastructure nodes as colored circles and edges as lines,
+ * colored by edge_type. Failed nodes pulse red during cascade animation.
+ * Overlays the mockup's empty/loading/error states and a legend + road
+ * layer toggle, all on top of the real OpenStreetMap basemap (kept as-is —
+ * this network is georeferenced to real Manipal coordinates, unlike the
+ * design mockup's synthetic "no basemap" network view).
  */
 
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useRef, useCallback, useState, useMemo } from "react";
 import maplibregl from "maplibre-gl";
 import { Deck } from "@deck.gl/core";
 import { ScatterplotLayer, LineLayer } from "@deck.gl/layers";
-import type { InfraNode, InfraEdge } from "../types";
+import type { InfraNode, InfraEdge, EdgeType } from "../types";
 import { NODE_COLORS, NODE_LABELS, FAILED_COLOR, SELECTED_COLOR } from "../types";
 import { useUIStore } from "../stores/uiStore";
 import { useSimulationStore } from "../stores/simulationStore";
+import { EmptyMapState, LoadingMapState, ErrorMapState } from "./shared/MapStateOverlay";
+import Banner from "./shared/Banner";
 
 interface MapViewProps {
   nodes: InfraNode[];
   edges: InfraEdge[];
 }
+
+type EdgeRow = InfraEdge & {
+  sourcePos: [number, number];
+  targetPos: [number, number];
+  src: InfraNode;
+  tgt: InfraNode;
+};
 
 // Manipal center coordinates
 const INITIAL_VIEW = {
@@ -26,6 +39,20 @@ const INITIAL_VIEW = {
   zoom: 14.5,
   pitch: 0,
   bearing: 0,
+};
+
+const EDGE_COLORS: Record<EdgeType, [number, number, number, number]> = {
+  power_supply: [239, 68, 68, 140],
+  water_supply: [59, 130, 246, 150],
+  road_link: [100, 116, 139, 110],
+  depends_on: [197, 143, 196, 150],
+};
+
+const EDGE_LABELS: Record<EdgeType, string> = {
+  power_supply: "Power supply",
+  water_supply: "Water supply",
+  road_link: "Road link",
+  depends_on: "Dependency",
 };
 
 export default function MapView({ nodes, edges }: MapViewProps) {
@@ -40,6 +67,12 @@ export default function MapView({ nodes, edges }: MapViewProps) {
   const failedNodeIds = useSimulationStore((s) => s.failedNodeIds);
   const mode = useUIStore((s) => s.mode);
   const redundancyNodes = useUIStore((s) => s.redundancyNodes);
+  const result = useSimulationStore((s) => s.result);
+  const isRunning = useSimulationStore((s) => s.isRunning);
+  const runError = useSimulationStore((s) => s.runError);
+
+  const [showRoads, setShowRoads] = useState(true);
+  const [layersOpen, setLayersOpen] = useState(false);
 
   // Pulsing animation for failed nodes
   const [pulseRadius, setPulseRadius] = useState(1);
@@ -62,14 +95,18 @@ export default function MapView({ nodes, edges }: MapViewProps) {
     return map;
   }, [nodes]);
 
+  const visibleEdgeTypes = useMemo(() => new Set(edges.map((e) => e.edge_type)), [edges]);
+
   // Update deck.gl layers when state changes
   const updateLayers = useCallback(() => {
     if (!deckRef.current) return;
     const lookup = nodeById();
 
+    const visibleNodes = showRoads ? nodes : nodes.filter((n) => n.node_type !== "road_junction");
+
     const nodeLayer = new ScatterplotLayer<InfraNode>({
       id: "nodes",
-      data: nodes,
+      data: visibleNodes,
       getPosition: (d) => [d.lng, d.lat],
       getRadius: (d) => {
         const base = d.node_type === "road_junction" ? 30 : 50;
@@ -119,17 +156,21 @@ export default function MapView({ nodes, edges }: MapViewProps) {
       },
     });
 
-    // Build edge line data
+    // Build edge line data, colored by edge_type (dimmed further when either
+    // endpoint is a hidden road junction and roads are off).
+    const visibleIds = new Set(visibleNodes.map((n) => n.id));
     const edgeData = edges
+      .filter((e) => showRoads || e.edge_type !== "road_link")
       .map((e) => {
         const src = lookup.get(e.source_id);
         const tgt = lookup.get(e.target_id);
         if (!src || !tgt) return null;
+        if (!visibleIds.has(e.source_id) || !visibleIds.has(e.target_id)) return null;
         return { ...e, sourcePos: [src.lng, src.lat] as [number, number], targetPos: [tgt.lng, tgt.lat] as [number, number], src, tgt };
       })
-      .filter(Boolean) as (InfraEdge & { sourcePos: [number, number]; targetPos: [number, number]; src: InfraNode; tgt: InfraNode })[];
+      .filter(Boolean) as EdgeRow[];
 
-    const edgeLayer = new LineLayer({
+    const edgeLayer = new LineLayer<EdgeRow>({
       id: "edges",
       data: edgeData,
       pickable: false,
@@ -138,10 +179,10 @@ export default function MapView({ nodes, edges }: MapViewProps) {
       getColor: (d) => {
         const srcFailed = failedNodeIds.has(d.src.id);
         const tgtFailed = failedNodeIds.has(d.tgt.id);
-        if (srcFailed || tgtFailed) return [220, 38, 38, 80];
-        return [100, 116, 139, 120];
+        if (srcFailed || tgtFailed) return [220, 38, 38, srcFailed && tgtFailed ? 200 : 90];
+        return EDGE_COLORS[d.edge_type] ?? [100, 116, 139, 120];
       },
-      getWidth: 2,
+      getWidth: (d) => (d.edge_type === "road_link" ? 1.5 : 2.5),
       updateTriggers: {
         getColor: [failedNodeIds],
       },
@@ -149,13 +190,13 @@ export default function MapView({ nodes, edges }: MapViewProps) {
 
     // Blast radius ring for newly failed nodes
     const currentWave = useSimulationStore.getState().currentWave;
-    const result = useSimulationStore.getState().result;
-    const waves = result ? result.waves : [];
+    const activeResult = useSimulationStore.getState().result;
+    const waves = activeResult ? activeResult.waves : [];
     const blastNodes =
       currentWave >= 0 && currentWave < waves.length
-        ? waves[currentWave].failed_node_ids
+        ? (waves[currentWave].failed_node_ids
             .map((id: string) => lookup.get(id))
-            .filter(Boolean) as InfraNode[]
+            .filter(Boolean) as InfraNode[])
         : [];
 
     const blastLayer = new ScatterplotLayer<InfraNode>({
@@ -172,7 +213,7 @@ export default function MapView({ nodes, edges }: MapViewProps) {
     });
 
     deckRef.current.setProps({ layers: [edgeLayer, blastLayer, nodeLayer] });
-  }, [nodes, edges, failedNodeIds, selectedNodeIds, hoveredNodeId, pulseRadius, nodeById, toggleNodeSelection, setHoveredNode]);
+  }, [nodes, edges, failedNodeIds, selectedNodeIds, hoveredNodeId, pulseRadius, nodeById, toggleNodeSelection, setHoveredNode, mode, redundancyNodes, showRoads]);
 
   // Initialize MapLibre + deck.gl
   useEffect(() => {
@@ -278,10 +319,125 @@ export default function MapView({ nodes, edges }: MapViewProps) {
     updateLayers();
   }, [updateLayers]);
 
+  const legendNodeTypes = useMemo(() => {
+    const seen = new Set(nodes.map((n) => n.node_type));
+    return (Object.keys(NODE_LABELS) as (keyof typeof NODE_LABELS)[]).filter((t) => seen.has(t));
+  }, [nodes]);
+
+  const showEmpty = !isRunning && !runError && (!result || result.status !== "completed");
+  const showLoading = isRunning;
+  const showError = !!runError && !isRunning;
+
   return (
-    <div
-      ref={containerRef}
-      style={{ width: "100%", height: "100%", position: "relative" }}
-    />
+    <div style={{ width: "100%", height: "100%", position: "relative" }}>
+      <div ref={containerRef} style={{ width: "100%", height: "100%", position: "relative" }} />
+
+      {/* ---------- layers control (top-right, under nav controls) ---------- */}
+      <div
+        style={{
+          position: "absolute",
+          top: 10,
+          right: 52,
+          zIndex: 4,
+          width: 190,
+          display: "flex",
+          flexDirection: "column",
+          gap: 1,
+          padding: "7px 8px 8px",
+          background: "rgba(11,15,20,.92)",
+          border: "1px solid var(--rp-divider-strong)",
+        }}
+      >
+        <button
+          onClick={() => setLayersOpen((v) => !v)}
+          style={{ display: "flex", alignItems: "center", gap: 7, padding: "2px 2px 5px", background: "transparent", border: "none", cursor: "pointer", textAlign: "left", width: "100%" }}
+        >
+          <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="var(--rp-accent)" strokeWidth={1.5} style={{ flexShrink: 0 }}>
+            <path d="M12 2l9 5-9 5-9-5 9-5zM3 12l9 5 9-5M3 17l9 5 9-5" />
+          </svg>
+          <span style={{ fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--rp-dim)" }}>Layers</span>
+          <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="var(--rp-mute)" strokeWidth={1.6} style={{ flexShrink: 0, marginLeft: "auto", transform: layersOpen ? "rotate(0deg)" : "rotate(-90deg)" }}>
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </button>
+        {layersOpen && (
+          <label
+            style={{ display: "flex", alignItems: "center", gap: 7, padding: "5px 6px", cursor: "pointer", borderTop: "1px solid var(--rp-divider)" }}
+          >
+            <input type="checkbox" checked={showRoads} onChange={(e) => setShowRoads(e.target.checked)} style={{ accentColor: "var(--rp-accent)" }} />
+            <span style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              <span style={{ fontSize: 11.5, color: "var(--rp-text)" }}>Road junctions</span>
+              <span style={{ fontSize: 10, color: "var(--rp-dim)" }}>{nodes.filter((n) => n.node_type === "road_junction").length} nodes</span>
+            </span>
+          </label>
+        )}
+      </div>
+
+      {/* ---------- guardrail notice ---------- */}
+      {result?.status === "completed" && result.cascade_stabilized === false && (
+        <div style={{ position: "absolute", top: 10, left: 10, right: 250, zIndex: 4 }}>
+          <Banner tone="warning">
+            <strong>Cascade not stabilized.</strong> The run reached the wave guardrail while still
+            spreading — this is a bounded, valid snapshot, not a settled end state.
+          </Banner>
+        </div>
+      )}
+
+      {/* ---------- legend (bottom-left) ---------- */}
+      <div
+        style={{
+          position: "absolute",
+          left: 10,
+          bottom: 10,
+          zIndex: 4,
+          display: "flex",
+          flexDirection: "column",
+          gap: 5,
+          padding: "7px 10px",
+          background: "rgba(11,15,20,.9)",
+          border: "1px solid var(--rp-divider)",
+        }}
+      >
+        <span style={{ fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--rp-dim)" }}>Legend</span>
+        <div style={{ display: "grid", gridTemplateColumns: "auto auto", gap: "5px 16px" }}>
+          {legendNodeTypes.map((t) => {
+            const [r, g, b] = NODE_COLORS[t];
+            return (
+              <div key={t} style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                <span style={{ width: 9, height: 9, display: "block", background: `rgb(${r},${g},${b})`, border: "1px solid rgba(255,255,255,.3)" }} />
+                <span style={{ fontSize: 11, color: "var(--rp-accent-soft)", whiteSpace: "nowrap" }}>{NODE_LABELS[t]}</span>
+              </div>
+            );
+          })}
+          <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+            <span style={{ width: 9, height: 9, display: "block", background: "rgb(239,68,68)", border: "1px solid rgba(255,255,255,.3)" }} />
+            <span style={{ fontSize: 11, color: "var(--rp-accent-soft)", whiteSpace: "nowrap" }}>Failed</span>
+          </div>
+        </div>
+        {edges.length > 0 && (
+          <>
+            <div style={{ height: 1, background: "var(--rp-divider)", margin: "2px 0" }} />
+            <div style={{ display: "grid", gridTemplateColumns: "auto auto", gap: "5px 16px" }}>
+              {(Object.keys(EDGE_LABELS) as EdgeType[])
+                .filter((t) => visibleEdgeTypes.has(t))
+                .map((t) => {
+                  const [r, g, b] = EDGE_COLORS[t];
+                  return (
+                    <div key={t} style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                      <span style={{ width: 12, height: 2, display: "block", background: `rgb(${r},${g},${b})` }} />
+                      <span style={{ fontSize: 11, color: "var(--rp-accent-soft)", whiteSpace: "nowrap" }}>{EDGE_LABELS[t]}</span>
+                    </div>
+                  );
+                })}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* ---------- state overlays ---------- */}
+      {showEmpty && <EmptyMapState />}
+      {showLoading && <LoadingMapState />}
+      {showError && <ErrorMapState message={runError ?? undefined} />}
+    </div>
   );
 }

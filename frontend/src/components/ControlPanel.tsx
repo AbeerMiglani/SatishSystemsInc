@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useUIStore } from "../stores/uiStore";
 import { useSimulationStore } from "../stores/simulationStore";
 import { useRunSimulation, useSimulationResult, useCreateScenario, useNetworkTopology } from "../api/hooks";
 import type { InfraNode } from "../types";
 import { comparablePopulation } from "../types";
+import ProvenanceTag from "./shared/ProvenanceTag";
 
 const ControlPanel: React.FC = () => {
   const mode = useUIStore((s) => s.mode);
@@ -24,31 +25,39 @@ const ControlPanel: React.FC = () => {
     return map;
   }, [topology]);
 
-  const { result, reset, setSimulationResult, addSimulation, registerScenario } =
+  const { result, reset, setSimulationResult, addSimulation, registerScenario, setRunning, setRunError } =
     useSimulationStore();
   const [dismissedSimulationIds, setDismissedSimulationIds] = useState<Set<string>>(new Set());
-  
+
   const simMutation = useRunSimulation();
   const createScenarioMutation = useCreateScenario();
-  
+
   const { data: polledResult } = useSimulationResult(simMutation.data?.id || null);
+
+  // Ids this panel has already adopted/recorded once they settled. Deciding
+  // by "have I handled this polled id before" — rather than by comparing
+  // against the shared `result` — matters: `result` can legitimately move on
+  // afterward (e.g. RecommendationPanel adopting a verified rerun), and the
+  // old comparison (`result.id !== polledResult.id`) treated that as "my
+  // baseline hasn't been adopted yet" and silently re-adopted it, reverting
+  // the whole app back to the pre-intervention baseline behind the user's
+  // back. A ref survives re-renders without re-triggering this effect.
+  const handledPolledIds = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!polledResult || polledResult.status !== "completed") return;
+    if (handledPolledIds.current.has(polledResult.id)) return;
+    handledPolledIds.current.add(polledResult.id);
 
     // The store owns persistence of `ripple_simulations`; setSimulationResult
     // records the run as part of adopting it.
-    if (!dismissedSimulationIds.has(polledResult.id) && (!result || result.id !== polledResult.id)) {
+    if (!dismissedSimulationIds.has(polledResult.id)) {
       setSimulationResult(polledResult);
       return;
     }
 
-    // Dismissed, or already the active result — setSimulationResult is skipped,
-    // so record the run directly instead of losing it from history. The
-    // already-stored check reads through getState() rather than subscribing to
-    // `simulations`, so this effect cannot be re-triggered by its own write.
-    if (useSimulationStore.getState().simulations.some((s) => s.id === polledResult.id)) return;
-
+    // Dismissed — setSimulationResult is skipped, so record the run directly
+    // instead of losing it from history.
     addSimulation(
       {
         id: polledResult.id,
@@ -60,14 +69,35 @@ const ControlPanel: React.FC = () => {
       },
       false
     );
-  }, [polledResult, result, dismissedSimulationIds, setSimulationResult, addSimulation]);
+  }, [polledResult, dismissedSimulationIds, setSimulationResult, addSimulation]);
+
+  // Broadcast running/failed status to the shared store so the map overlay
+  // and impact summary agree with this panel about what's happening.
+  useEffect(() => {
+    if (simMutation.isPending) {
+      setRunning(true);
+      return;
+    }
+    if (simMutation.isError) {
+      setRunError(simMutation.error instanceof Error ? simMutation.error.message : "Failed to start simulation.");
+      return;
+    }
+    if (polledResult) {
+      if (polledResult.status === "failed") {
+        setRunError(polledResult.error_message || "The simulation engine reported a failure.");
+      } else if (polledResult.status === "pending" || polledResult.status === "running") {
+        setRunning(true);
+      }
+    }
+  }, [simMutation.isPending, simMutation.isError, simMutation.error, polledResult, setRunning, setRunError]);
 
   const handleRunBaseline = () => {
     if (!networkId || selectedNodeIds.size === 0) return;
+    setRunning(true);
     simMutation.mutate({
       network_id: networkId,
       initial_failures: Array.from(selectedNodeIds),
-      scenario_id: undefined
+      scenario_id: undefined,
     });
   };
 
@@ -83,12 +113,12 @@ const ControlPanel: React.FC = () => {
             source: redundancyNodes[0],
             target: redundancyNodes[1],
             edge_type: "power_supply",
-            is_bidirectional: true
-          }
+            is_bidirectional: true,
+          },
         ],
-        initial_failures: Array.from(selectedNodeIds)
+        initial_failures: Array.from(selectedNodeIds),
       });
-      
+
       // registerScenario persists to `ripple_scenarios` and updates the store's
       // `scenarios` / `lastAppliedScenarioId`, so ScenarioCompare picks the new
       // scenario up immediately rather than only after a reload.
@@ -100,17 +130,16 @@ const ControlPanel: React.FC = () => {
         created_at: scenario.created_at ?? new Date().toISOString(),
       });
 
-      // Run the scenario simulation
+      setRunning(true);
       simMutation.mutate({
         network_id: networkId,
         initial_failures: Array.from(selectedNodeIds),
-        scenario_id: scenario.id
+        scenario_id: scenario.id,
       });
-      
+
       setMode("default");
     } catch (e) {
-      console.error(e);
-      alert("Failed to create scenario: " + e);
+      setRunError(e instanceof Error ? e.message : "Failed to create scenario.");
     }
   };
 
@@ -128,47 +157,36 @@ const ControlPanel: React.FC = () => {
   const isRunning = simMutation.isPending || (polledResult && polledResult.status !== "completed" && polledResult.status !== "failed");
 
   return (
-    <div style={{ padding: 16 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <h2 style={{ fontSize: 18, fontWeight: 700 }}>Simulation Controls</h2>
-        <select 
-          style={{ background: "#1e293b", color: "white", padding: "4px 8px", borderRadius: 4, border: "1px solid #334155" }}
+    <div style={{ padding: 16, borderBottom: "1px solid var(--rp-divider)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <h4 style={{ fontSize: 13.5, letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--rp-text)" }}>Simulation controls</h4>
+        <select
+          className="rp-btn rp-btn-secondary"
+          style={{ fontSize: 11.5, padding: "4px 8px" }}
           value={mode}
           onChange={(e) => setMode(e.target.value as any)}
         >
-          <option value="default">Baseline Simulation</option>
-          <option value="add_redundancy">What-If: Add Redundancy</option>
+          <option value="default">Baseline</option>
+          <option value="add_redundancy">What-if: add redundancy</option>
         </select>
       </div>
-      
+
       {mode === "default" && (
-        <div style={{ marginBottom: 16 }}>
+        <div style={{ marginBottom: 12 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-            <span style={{ fontSize: 13, color: "#94a3b8", fontWeight: 600 }}>
-              Initial Failures ({selectedNodeIds.size}):
+            <span style={{ fontSize: 11.5, color: "var(--rp-mute)", fontWeight: 600 }}>
+              Initial failures ({selectedNodeIds.size})
             </span>
             {selectedNodeIds.size > 0 && (
-              <button
-                onClick={clearSelection}
-                disabled={isRunning}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  color: "#f87171",
-                  fontSize: 11,
-                  cursor: "pointer",
-                  padding: 0,
-                  textDecoration: "underline",
-                }}
-              >
+              <button className="rp-btn rp-btn-ghost" style={{ fontSize: 11, padding: 0 }} onClick={clearSelection} disabled={!!isRunning}>
                 Clear all
               </button>
             )}
           </div>
 
           {selectedNodeIds.size === 0 ? (
-            <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 10px 0", fontStyle: "italic" }}>
-              Click nodes on the map or graph to select failure trigger points.
+            <p style={{ fontSize: 12, color: "var(--rp-mute)", margin: "0 0 10px 0", fontStyle: "italic" }}>
+              Click assets on the map or the topology graph to select failure trigger points.
             </p>
           ) : (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxHeight: 110, overflowY: "auto", marginBottom: 10, padding: "2px 0" }}>
@@ -184,9 +202,8 @@ const ControlPanel: React.FC = () => {
                       display: "inline-flex",
                       alignItems: "center",
                       gap: 4,
-                      background: "#1e293b",
-                      border: "1px solid #ef4444",
-                      borderRadius: 4,
+                      background: "var(--rp-surface-2)",
+                      border: "1px solid var(--rp-wave-0)",
                       padding: "2px 6px",
                       fontSize: 11,
                       color: "#fca5a5",
@@ -194,25 +211,14 @@ const ControlPanel: React.FC = () => {
                     title={`ID: ${id} | Source: ${nameSource} | Quality: ${dataQuality}`}
                   >
                     <span>{name}</span>
-                    <span style={{ fontSize: 9, padding: "0 3px", borderRadius: 2, background: "#334155", color: "#94a3b8" }}>
-                      {nameSource}
-                    </span>
+                    <span style={{ fontSize: 9, padding: "0 3px", background: "var(--rp-surface-3)", color: "var(--rp-mute)" }}>{nameSource}</span>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         toggleNodeSelection(id);
                       }}
-                      disabled={isRunning}
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        color: "#94a3b8",
-                        cursor: "pointer",
-                        fontSize: 13,
-                        lineHeight: 1,
-                        padding: 0,
-                        marginLeft: 2,
-                      }}
+                      disabled={!!isRunning}
+                      style={{ background: "transparent", border: "none", color: "var(--rp-mute)", cursor: "pointer", fontSize: 13, lineHeight: 1, padding: 0, marginLeft: 2 }}
                       title="Deselect node"
                     >
                       ×
@@ -225,26 +231,19 @@ const ControlPanel: React.FC = () => {
 
           <div style={{ display: "flex", gap: 8 }}>
             <button
+              className={`rp-btn ${selectedNodeIds.size > 0 && !isRunning ? "rp-btn-danger" : "rp-btn-secondary"}`}
+              style={{ flex: 1 }}
               onClick={handleRunBaseline}
-              disabled={selectedNodeIds.size === 0 || isRunning}
-              style={{
-                flex: 1,
-                padding: "8px 16px",
-                background: isRunning ? "#64748b" : (selectedNodeIds.size > 0 ? "#ef4444" : "#334155"),
-                color: "white",
-                border: "none",
-                borderRadius: 4,
-                cursor: (selectedNodeIds.size === 0 || isRunning) ? "not-allowed" : "pointer",
-                fontWeight: "bold",
-              }}
+              disabled={selectedNodeIds.size === 0 || !!isRunning}
             >
-              {isRunning ? "Running..." : "Simulate Baseline"}
+              {isRunning && (
+                <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="rp-spin">
+                  <path d="M12 3a9 9 0 019 9" strokeLinecap="round" />
+                </svg>
+              )}
+              {isRunning ? "Running…" : "Simulate baseline"}
             </button>
-            <button
-              onClick={clearSelection}
-              disabled={selectedNodeIds.size === 0 || isRunning}
-              style={{ padding: "8px 16px", background: "#334155", color: "white", border: "none", borderRadius: 4, cursor: "pointer" }}
-            >
+            <button className="rp-btn rp-btn-secondary" onClick={clearSelection} disabled={selectedNodeIds.size === 0 || !!isRunning}>
               Clear
             </button>
           </div>
@@ -252,125 +251,78 @@ const ControlPanel: React.FC = () => {
       )}
 
       {mode === "add_redundancy" && (
-        <div style={{ marginBottom: 16, background: "#064e3b", padding: 12, borderRadius: 4, border: "1px solid #059669" }}>
-          <p style={{ fontSize: 14, marginBottom: 8, color: "#a7f3d0" }}>
-            1. Select exactly 2 nodes to add a redundant power line between.<br/>
-            2. Make sure you also have initial failures selected (using Baseline mode).
+        <div className="rp-blueprint" style={{ marginBottom: 12, padding: 12, background: "rgba(92,178,166,.06)", borderColor: "rgba(92,178,166,.4)" }}>
+          <i className="rp-corner tl" />
+          <i className="rp-corner br" />
+          <p style={{ fontSize: 12.5, marginBottom: 8, color: "var(--rp-teal-bright)", lineHeight: 1.5 }}>
+            1. Select exactly 2 nodes to add a redundant power line between.
+            <br />
+            2. Also select initial failures in Baseline mode.
           </p>
-          <div style={{ fontSize: 13, marginBottom: 8, color: "#cbd5e1" }}>
-            <span>Connect Pair ({redundancyNodes.length}/2):</span>
+          <div style={{ fontSize: 12, marginBottom: 8, color: "var(--rp-text-dim)" }}>
+            <span>Connect pair ({redundancyNodes.length}/2):</span>
             {redundancyNodes.length > 0 ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 4 }}>
                 {redundancyNodes.map((id, idx) => (
-                  <span
-                    key={id}
-                    style={{
-                      background: "#065f46",
-                      border: "1px solid #10b981",
-                      borderRadius: 4,
-                      padding: "2px 8px",
-                      fontSize: 11,
-                      color: "#a7f3d0",
-                    }}
-                  >
+                  <span key={id} style={{ background: "rgba(92,178,166,.12)", border: "1px solid var(--rp-teal)", padding: "2px 8px", fontSize: 11, color: "var(--rp-teal-bright)" }}>
                     {idx === 0 ? "From: " : "To: "}
                     <strong>{nodeLookup.get(id)?.display_name || nodeLookup.get(id)?.name || id.slice(0, 8)}</strong>
                   </span>
                 ))}
               </div>
             ) : (
-              <span style={{ color: "#6ee7b7", fontStyle: "italic", marginLeft: 4 }}>Select 2 nodes on map</span>
+              <span style={{ color: "var(--rp-teal)", fontStyle: "italic", marginLeft: 4 }}>Select 2 nodes on the map</span>
             )}
           </div>
-          <p style={{ fontSize: 13, marginBottom: 12 }}>Initial Failures ready: {selectedNodeIds.size}</p>
+          <p style={{ fontSize: 12, marginBottom: 10 }}>Initial failures ready: {selectedNodeIds.size}</p>
           <div style={{ display: "flex", gap: 8 }}>
             <button
+              className="rp-btn rp-btn-primary"
+              style={{ flex: 1, background: "var(--rp-teal)", borderColor: "var(--rp-teal)" }}
               onClick={handleSaveScenario}
-              disabled={redundancyNodes.length !== 2 || selectedNodeIds.size === 0 || isRunning}
-              style={{
-                flex: 1,
-                padding: "8px 16px",
-                background: (redundancyNodes.length === 2 && selectedNodeIds.size > 0 && !isRunning) ? "#10b981" : "#334155",
-                color: "white",
-                border: "none",
-                borderRadius: 4,
-                cursor: "pointer",
-                fontWeight: "bold",
-              }}
+              disabled={redundancyNodes.length !== 2 || selectedNodeIds.size === 0 || !!isRunning}
             >
-              {isRunning ? "Running..." : "Save & Simulate"}
+              {isRunning ? "Running…" : "Save & simulate"}
             </button>
-            <button
-              onClick={clearRedundancyNodes}
-              style={{ padding: "8px 16px", background: "#334155", color: "white", border: "none", borderRadius: 4, cursor: "pointer" }}
-            >
+            <button className="rp-btn rp-btn-secondary" onClick={clearRedundancyNodes}>
               Clear
             </button>
           </div>
         </div>
       )}
 
+      {simMutation.isError && (
+        <div className="rp-blueprint" style={{ marginBottom: 12, padding: "8px 10px", background: "rgba(240,68,56,.08)", borderColor: "rgba(240,68,56,.4)" }}>
+          <span style={{ fontSize: 12, color: "var(--rp-error-soft)" }}>
+            {simMutation.error instanceof Error ? simMutation.error.message : "Failed to start simulation."}
+          </span>
+        </div>
+      )}
+
       {result && result.status === "completed" && (
-        <div style={{ padding: 12, background: "#1e293b", borderRadius: 4, marginBottom: 16 }}>
-          <h3 style={{ margin: "0 0 8px 0", fontSize: 14 }}>Simulation Results</h3>
-          <p style={{ margin: "4px 0", fontSize: 13 }}>Waves: <span style={{ color: "#3b82f6" }}>{result.waves.length}</span></p>
-          <p style={{ margin: "4px 0", fontSize: 13 }}>Failed Assets: <span style={{ color: "#ef4444" }}>{result.total_failed}</span></p>
-          <div style={{ margin: "4px 0", fontSize: 13, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
-            <span>
-              Pop Affected:{" "}
-              <strong style={{ color: "#f59e0b" }}>
-                {comparablePopulation(result).toLocaleString()}
-              </strong>
-            </span>
+        <div style={{ padding: 10, background: "var(--rp-surface-3)", display: "flex", flexDirection: "column", gap: 3 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 12, color: "var(--rp-mute)" }}>Active result</span>
+            <button className="rp-btn rp-btn-ghost" style={{ fontSize: 10.5, padding: 0 }} onClick={handleResetTimeline}>
+              Clear
+            </button>
+          </div>
+          <p style={{ margin: "2px 0", fontSize: 12.5 }}>
+            Failed: <strong style={{ color: "var(--rp-wave-0)" }}>{result.total_failed}</strong> · Waves:{" "}
+            <strong style={{ color: "var(--rp-accent)" }}>{result.waves.length}</strong>
+          </p>
+          <p style={{ margin: "2px 0", fontSize: 12.5, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+            Pop affected: <strong style={{ color: "var(--rp-wave-2)" }}>{comparablePopulation(result).toLocaleString()}</strong>
             {result.has_unresolved_overlap && (
-              <span
-                title="Multiple utility failure areas overlap without parcel-level polygon data. Total is capped at study-area limit."
-                style={{
-                  background: "#d97706",
-                  color: "#ffffff",
-                  padding: "1px 6px",
-                  borderRadius: 4,
-                  fontSize: 10,
-                  fontWeight: 600,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 3,
-                }}
-              >
-                ⚠️ Unresolved Overlap
+              <span title="Multiple utility failure areas overlap without parcel-level polygon data. Total is capped at the study-area limit.">
+                <ProvenanceTag kind="estimated" label="⚠ overlap" />
               </span>
             )}
-          </div>
-          {result.is_population_capped && (
-            <span style={{ color: "#94a3b8", fontSize: 11, display: "block", marginBottom: 4 }}>
-              Uncapped exposure sum; service areas overlap. Headline figure is
-              capped at the {(result.study_area_population_cap ?? 65000).toLocaleString()}{" "}
-              study-area limit
-              {result.raw_population_affected != null &&
-                ` (reported as ${result.population_affected_estimate.toLocaleString()})`}
-              .
-            </span>
-          )}
+          </p>
           {result.cascade_stabilized === false && (
-            <span
-              title="The cascade was still spreading when it reached the configured wave limit. The result below is a valid bounded snapshot, not a settled end state."
-              style={{
-                display: "inline-block",
-                background: "#7c2d12",
-                border: "1px solid #ea580c",
-                color: "#fed7aa",
-                borderRadius: 4,
-                padding: "1px 6px",
-                fontSize: 10,
-                fontWeight: 600,
-                marginBottom: 4,
-              }}
-            >
-              ⏱ Truncated at wave limit — not stabilized
-            </span>
-          )}
-          {result.global_efficiency_before !== null && result.global_efficiency_after !== null && (
-            <p style={{ margin: "4px 0", fontSize: 13 }}>Efficiency: <span style={{ color: "#22c55e" }}>{(result.global_efficiency_before * 100).toFixed(1)}%</span> → <span style={{ color: "#ef4444" }}>{(result.global_efficiency_after * 100).toFixed(1)}%</span></p>
+            <div style={{ marginTop: 2 }}>
+              <ProvenanceTag kind="derived" label="⏱ truncated at wave guardrail" />
+            </div>
           )}
         </div>
       )}
