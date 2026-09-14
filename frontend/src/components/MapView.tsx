@@ -48,6 +48,25 @@ const EDGE_COLORS: Record<EdgeType, [number, number, number, number]> = {
   depends_on: [197, 143, 196, 150],
 };
 
+/**
+ * The tooltip is built as an HTML string, so anything interpolated into it has
+ * to be escaped. Asset names arrive from the network topology and, once the
+ * OSM importer is enabled, ultimately from OpenStreetMap — data this app does
+ * not control.
+ */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function titleCase(value: string): string {
+  return value ? value.charAt(0).toUpperCase() + value.slice(1) : "Unknown";
+}
+
 const EDGE_LABELS: Record<EdgeType, string> = {
   power_supply: "Power supply",
   water_supply: "Water supply",
@@ -73,6 +92,21 @@ export default function MapView({ nodes, edges }: MapViewProps) {
 
   const [showRoads, setShowRoads] = useState(true);
   const [layersOpen, setLayersOpen] = useState(false);
+
+  /**
+   * Live cascade state for the tooltip.
+   *
+   * `getTooltip` is registered once, inside the mount-only effect below, so it
+   * closes over whatever `failedNodeIds` was at mount — an empty set. Reading
+   * through a ref is what lets a callback with a frozen closure see current
+   * state. Without it the tooltip reported the persisted `status` column,
+   * which the engine never writes back, so a node rendered red and pulsing
+   * mid-cascade still read "Operational" in green.
+   */
+  const failedNodeIdsRef = useRef<Set<string>>(failedNodeIds);
+  useEffect(() => {
+    failedNodeIdsRef.current = failedNodeIds;
+  }, [failedNodeIds]);
 
   // Pulsing animation for failed nodes
   const [pulseRadius, setPulseRadius] = useState(1);
@@ -259,27 +293,40 @@ export default function MapView({ nodes, edges }: MapViewProps) {
         if (!object) return null;
         const typeLabel = NODE_LABELS[object.node_type] || object.node_type;
         const color = NODE_COLORS[object.node_type] || [148, 163, 184];
-        const statusColor = object.status === "failed" ? "#ef4444" : "#22c55e";
+
+        // The simulation is the authority on status while a run is loaded;
+        // `object.status` is a persisted column the engine never updates.
+        const hasFailed = failedNodeIdsRef.current.has(object.id);
+        const status = hasFailed ? "Failed" : titleCase(object.status);
+        const statusColor = hasFailed ? "var(--rp-wave-0)" : "var(--rp-ok)";
+
+        const name = escapeHtml(object.display_name || object.name || "Unnamed Asset");
+        const source = escapeHtml(object.name_source || object.data_source || "synthetic");
+        const quality = escapeHtml(object.data_quality || "estimated");
+
         return {
           html: `
-            <div style="font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; font-size: 12px; color: #f8fafc; min-width: 160px; line-height: 1.4;">
-              <div style="font-weight: 700; font-size: 13px; color: #ffffff; margin-bottom: 3px;">${object.display_name || object.name || "Unnamed Asset"}</div>
+            <div style="font-family: var(--rp-font-body); font-size: var(--rp-text-md); color: var(--rp-text); min-width: 168px; line-height: 1.4;">
+              <div style="font-family: var(--rp-font-heading); font-weight: 600; font-size: var(--rp-text-lg); color: var(--rp-text); margin-bottom: 3px;">${name}</div>
               <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
-                <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: rgb(${color.join(',')});"></span>
-                <span style="color: #94a3b8; font-size: 11px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;">${typeLabel}</span>
-                <span style="color: ${statusColor}; font-size: 10px; margin-left: auto; text-transform: capitalize;">${object.status}</span>
+                <span style="display: inline-block; width: 8px; height: 8px; background-color: rgb(${color.join(",")});"></span>
+                <span style="color: var(--rp-mute); font-size: var(--rp-text-sm); text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;">${escapeHtml(typeLabel)}</span>
+                <span style="color: ${statusColor}; font-size: var(--rp-text-sm); font-weight: 600; margin-left: auto;">${status}</span>
               </div>
-              <div style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; color: #64748b; border-top: 1px solid #334155; padding-top: 4px; margin-top: 4px;">
-                ID: ${object.id}
+              ${
+                object.population_served
+                  ? `<div style="font-size: var(--rp-text-sm); color: var(--rp-text-dim);">Serves ${object.population_served.toLocaleString()} people</div>`
+                  : ""
+              }
+              <div style="font-size: var(--rp-text-xs); color: var(--rp-faint); border-top: 1px solid var(--rp-divider); padding-top: 4px; margin-top: 5px;">
+                ${source} \u00b7 ${quality}
               </div>
-              ${object.population_served ? `<div style="font-size: 11px; color: #cbd5e1; margin-top: 2px;">Pop Served: ${object.population_served.toLocaleString()}</div>` : ""}
-              <div style="font-size: 10px; color: #a7f3d0; margin-top: 2px;">Source: ${object.name_source || object.data_source || "synthetic"} | Quality: ${object.data_quality || "estimated"}</div>
             </div>
           `,
           style: {
-            backgroundColor: "#0f172a",
-            border: "1px solid #334155",
-            borderRadius: "6px",
+            backgroundColor: "var(--rp-surface)",
+            border: "1px solid var(--rp-divider-strong)",
+            borderRadius: "var(--rp-radius)",
             padding: "8px 12px",
             boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.5)",
             pointerEvents: "none",

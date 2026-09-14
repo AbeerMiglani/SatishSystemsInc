@@ -10,9 +10,12 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.db.redis import get_redis_client
 from app.models.network import Edge, Network, Node
+from app.services.geo import to_ewkt_point
 from app.services.graph_sync import clear_network_from_neo4j, sync_network_to_neo4j
+from app.simulation.population import SERVICE_RADIUS_DEFAULTS_M
 
 # In Docker, the data directory is mounted at /data
 SEED_DIR = Path("/data/seed")
@@ -25,9 +28,52 @@ CENTRALITY_CACHE_METRICS = ("betweenness", "pagerank")
 logger = logging.getLogger(__name__)
 
 
-def ingest_seed_data(db: Session, force: bool = False) -> str:
+def _configured_source() -> str:
+    """The configured topology source, read defensively.
+
+    The test suite replaces ``app.config`` with a MagicMock, so a bare attribute
+    read yields a truthy Mock rather than a string. Coercing here keeps the
+    synthetic default in any environment that has not explicitly opted in.
+    """
+    value = getattr(settings, "topology_source", "synthetic")
+    return value if value in {"synthetic", "osm"} else "synthetic"
+
+
+def resolve_seed_dir(source: str | None = None) -> Path:
+    """Return the directory to ingest the baseline topology from.
+
+    ``synthetic`` uses the committed seed fixture. ``osm`` pulls the real road
+    network for the configured place through the OSMnx pipeline, caching the
+    result so a re-seed does not re-download it.
+
+    Everything downstream is unchanged either way. The graph is still built from
+    the database, so the runner, the API, the map and the recommendation engine
+    need no knowledge of where the topology came from -- which is what lets the
+    Motter-Lai resimulations run against real-world geometry without a second
+    code path.
+    """
+    resolved = source or _configured_source()
+    if resolved != "osm":
+        return SEED_DIR
+
+    from app.services.osm_ingestion import download_osm_road_data
+
+    cache_dir = Path(str(getattr(settings, "osm_cache_dir", "/data/osm")))
+    if (cache_dir / "nodes.geojson").exists() and (cache_dir / "edges.json").exists():
+        logger.info("using cached OSM topology at %s", cache_dir)
+        return cache_dir
+
+    place = str(getattr(settings, "osm_place", "Manipal, Karnataka, India"))
+    network_type = str(getattr(settings, "osm_network_type", "drive"))
+    logger.info("downloading OSM topology for %r into %s", place, cache_dir)
+    download_osm_road_data(place, cache_dir, network_type)
+    return cache_dir
+
+
+def ingest_seed_data(db: Session, force: bool = False, source: str | None = None) -> str:
     """
     Ingests seed data if no networks exist (or if force=True).
+    ``source`` overrides the configured topology source for this call.
     Returns the network_id.
     """
     existing = db.query(Network).filter(Network.name == SEED_NETWORK_NAME).first()
@@ -35,11 +81,12 @@ def ingest_seed_data(db: Session, force: bool = False) -> str:
         logger.info("network %s already exists; skipping seed ingestion", existing.id)
         return str(existing.id)
 
-    logger.info("reading seed data from %s", SEED_DIR)
-    with open(SEED_DIR / "nodes.geojson", "r") as f:
+    seed_dir = resolve_seed_dir(source)
+    logger.info("reading seed data from %s", seed_dir)
+    with open(seed_dir / "nodes.geojson", "r") as f:
         nodes_data = json.load(f)
-        
-    with open(SEED_DIR / "edges.json", "r") as f:
+
+    with open(seed_dir / "edges.json", "r") as f:
         edges_data = json.load(f)
 
     # Keep relational ingestion atomic. Neo4j is a read-optimized mirror, so
@@ -61,7 +108,9 @@ def ingest_seed_data(db: Session, force: bool = False) -> str:
         node_objects = []
         for feature in nodes_data["features"]:
             props = feature["properties"]
+            # GeoJSON positions are [longitude, latitude] (RFC 7946 3.1.1).
             coords = feature["geometry"]["coordinates"]
+            node_type = props["node_type"]
             node_objects.append(
                 Node(
                     id=props["id"],
@@ -71,11 +120,17 @@ def ingest_seed_data(db: Session, force: bool = False) -> str:
                     node_type=props["node_type"],
                     lat=coords[1],
                     lng=coords[0],
-                    geom=f"SRID=4326;POINT({coords[0]} {coords[1]})",
+                    geom=to_ewkt_point(coords[1], coords[0]),
                     capacity=props["capacity"],
                     current_load=props["current_load"],
                     failure_threshold=props["failure_threshold"],
                     population_served=props["population_served"],
+                    # Service areas are what make population impact
+                    # deduplicable; fall back to the per-type planning radius
+                    # when the dataset does not declare one.
+                    service_radius_m=props.get(
+                        "service_radius_m", SERVICE_RADIUS_DEFAULTS_M.get(node_type)
+                    ),
                     status=props["status"],
                     is_synthetic=props.get("is_synthetic", True),
                     data_source=props.get("data_source", "synthetic"),
@@ -131,12 +186,18 @@ if __name__ == "__main__":
 
     from app.db.postgres import SessionLocal
 
-    parser = argparse.ArgumentParser(description="Ingest the synthetic Ripple seed network")
+    parser = argparse.ArgumentParser(description="Ingest the Ripple baseline network")
     parser.add_argument("--force", action="store_true", help="replace the existing named demo network")
+    parser.add_argument(
+        "--source",
+        choices=("synthetic", "osm"),
+        default=None,
+        help="baseline topology source; defaults to the TOPOLOGY_SOURCE setting",
+    )
     args = parser.parse_args()
 
     db = SessionLocal()
     try:
-        ingest_seed_data(db, force=args.force)
+        ingest_seed_data(db, force=args.force, source=args.source)
     finally:
         db.close()

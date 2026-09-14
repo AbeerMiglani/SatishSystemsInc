@@ -55,6 +55,10 @@ class Node(Base):
         CheckConstraint("current_load >= 0", name="ck_node_load_nonnegative"),
         CheckConstraint("failure_threshold > 0", name="ck_node_threshold_positive"),
         CheckConstraint("population_served >= 0", name="ck_node_population_nonnegative"),
+        CheckConstraint(
+            "service_radius_m IS NULL OR service_radius_m > 0",
+            name="ck_node_service_radius_positive",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -82,6 +86,11 @@ class Node(Base):
     current_load: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     failure_threshold: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
     population_served: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Radius of the area this asset actually serves, in metres. Nullable because
+    # it is not known for every asset: population impact falls back to an additive
+    # sum when it is absent, and deduplicates service areas spatially when it is
+    # present (see app.simulation.population).
+    service_radius_m: Mapped[float | None] = mapped_column(Float, nullable=True)
     status: Mapped[str] = mapped_column(
         Enum("operational", "degraded", "failed", name="node_status_enum"),
         default="operational",
@@ -140,7 +149,19 @@ class Edge(Base):
     )
 
     edge_type: Mapped[str] = mapped_column(
-        Enum("power_supply", "water_supply", "road_link", "depends_on", name="edge_type_enum"),
+        Enum(
+            "power_supply",
+            "water_supply",
+            "road_link",
+            "depends_on",
+            # Explicit dependency declarations. The supply/link names above carry
+            # an implicit dependency of the matching kind; these say so outright,
+            # for datasets that model the dependency separately from the delivery.
+            "requires_power",
+            "requires_water",
+            "requires_transit",
+            name="edge_type_enum",
+        ),
         nullable=False,
     )
     weight: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
@@ -203,6 +224,11 @@ class SimulationResult(Base):
     # Nullable because rows written before this column existed have no recorded
     # raw value, and back-filling one would misrepresent those runs.
     raw_population_affected: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Overlap-resolved total: each person is counted once even when several
+    # failed assets serve them. Nullable because it can only be computed when
+    # the nodes carry service geometry, and because rows written before this
+    # column existed have no value that could honestly be back-filled.
+    deduplicated_population_affected: Mapped[int | None] = mapped_column(Integer, nullable=True)
     study_area_population_cap: Mapped[int] = mapped_column(
         Integer, nullable=False, default=65000, server_default="65000"
     )

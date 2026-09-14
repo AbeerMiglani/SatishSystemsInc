@@ -10,7 +10,7 @@
  * here.
  */
 import type { InfraNode, SimulationResult } from "../types";
-import { comparablePopulation as compPop } from "../types";
+import { comparablePopulation as compPop, marginalFailures } from "../types";
 
 export interface ExplanationEntry {
   category: string;
@@ -30,9 +30,22 @@ export function criticalServicesOffline(nodes: InfraNode[], failedNodeIds: Set<s
   return count;
 }
 
+/**
+ * Every asset failed by the end of the run.
+ *
+ * The engine publishes the cumulative set on the final wave, so it is read
+ * rather than re-derived. Re-accumulating the per-wave lists here was fine as
+ * long as those lists were marginal, but it put the same union logic in three
+ * places and invited exactly the marginal/cumulative confusion this fixes.
+ * Older records without the field fall back to accumulating marginal sets.
+ */
 export function failedNodeIdsForResult(result: SimulationResult): Set<string> {
+  const last = result.waves[result.waves.length - 1];
+  if (last?.cumulative_failed_node_ids) {
+    return new Set([...last.cumulative_failed_node_ids, ...result.initial_failures]);
+  }
   const ids = new Set<string>();
-  for (const w of result.waves) for (const id of w.failed_node_ids) ids.add(id);
+  for (const w of result.waves) for (const id of marginalFailures(w)) ids.add(id);
   for (const id of result.initial_failures) ids.add(id);
   return ids;
 }
@@ -87,9 +100,13 @@ export function buildExplanation(params: {
     category: "Estimated population",
     color: "#c58fc4",
     field: "raw_population_affected",
-    text: `Exposure sums population_served across the failed assets: ${uncapped.toLocaleString()} uncapped.${
+    text: `${
+      result.deduplicated_population_affected != null
+        ? `Overlapping service areas are resolved geometrically, so each resident is counted once: ${result.deduplicated_population_affected.toLocaleString()} people affected, against an additive total of ${uncapped.toLocaleString()} that counts anyone served by two failed assets twice.`
+        : `Exposure sums population_served across the failed assets: ${uncapped.toLocaleString()} uncapped. These assets carry no service geometry, so overlapping areas could not be resolved and this total may count some residents more than once.`
+    }${
       result.is_population_capped
-        ? ` The headline figure is capped at the ${(result.study_area_population_cap ?? 65000).toLocaleString()} study-area total because service zones overlap and cannot be resolved without parcel-level data — so it is an estimate, not a count of people.`
+        ? ` The headline figure is capped at the ${(result.study_area_population_cap ?? 65000).toLocaleString()} study-area total, so it is an estimate rather than a count of people.`
         : ""
     }`,
   });

@@ -8,6 +8,7 @@ import { useSimulationStore } from "../stores/simulationStore";
 import { useNetworkTopology } from "../api/hooks";
 import { useUIStore } from "../stores/uiStore";
 import type { InfraNode } from "../types";
+import { marginalFailures } from "../types";
 import Section from "./shared/Section";
 
 const WAVE_COLORS = ["var(--rp-wave-0)", "var(--rp-wave-1)", "var(--rp-wave-2)"];
@@ -50,7 +51,14 @@ export default function WaveBreakdown() {
         {result.waves.map((w, i) => {
           const color = WAVE_COLORS[Math.min(i, 2)];
           const open = currentWave === i;
-          const names = w.failed_node_ids.map((id) => nodeLookup.get(id)?.display_name || nodeLookup.get(id)?.name || id.slice(0, 8));
+          // Marginal: what newly failed in THIS wave. Cumulative: the running
+          // total. Showing only one of them left the reader unable to tell a
+          // cascade that was accelerating from one that was burning out.
+          const marginal = marginalFailures(w);
+          const cumulative =
+            w.cumulative_failed_node_ids?.length ??
+            result.waves.slice(0, i + 1).reduce((n, prev) => n + marginalFailures(prev).length, 0);
+          const names = marginal.map((id) => nodeLookup.get(id)?.display_name || nodeLookup.get(id)?.name || id.slice(0, 8));
           return (
             <button
               key={i}
@@ -73,8 +81,11 @@ export default function WaveBreakdown() {
               </span>
               <span style={{ display: "flex", flexDirection: "column", gap: 3, flex: 1, minWidth: 0 }}>
                 <span style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                  <span style={{ fontSize: 11, color: "var(--rp-mute)", fontVariantNumeric: "tabular-nums" }}>
-                    {w.failed_node_ids.length} asset{w.failed_node_ids.length === 1 ? "" : "s"}
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--rp-text)", fontVariantNumeric: "tabular-nums" }}>
+                    +{marginal.length} newly offline
+                  </span>
+                  <span style={{ fontSize: 10.5, color: "var(--rp-mute)", fontVariantNumeric: "tabular-nums" }}>
+                    {cumulative} total
                   </span>
                 </span>
                 {open && names.length > 0 && (

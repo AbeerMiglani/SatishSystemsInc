@@ -17,10 +17,28 @@ from app.config import settings
 from app.db.postgres import SessionLocal
 from app.db.redis import get_redis_client
 from app.models.network import Edge, Node, Scenario, SimulationResult
+from app.services.graph_build import build_graph
 from app.simulation.cascade import run_cascade
+from app.simulation.isolation import isolated_graph
 from app.simulation.population import calculate_population_impact
 
 logger = logging.getLogger(__name__)
+
+
+def _setting(name: str, default):
+    """Read a setting defensively.
+
+    The test suite replaces ``app.config`` with a MagicMock, so a bare
+    ``settings.x`` returns a truthy Mock rather than a value. Anything read on
+    a path the tests exercise goes through here, which coerces to the expected
+    type and falls back to the documented default.
+    """
+    value = getattr(settings, name, default)
+    if isinstance(default, bool):
+        return value if isinstance(value, bool) else default
+    if isinstance(default, int):
+        return value if isinstance(value, int) else default
+    return value if isinstance(value, type(default)) else default
 
 
 def apply_scenario_modifications(
@@ -97,25 +115,11 @@ def run_simulation_task(
         nodes = db.query(Node).filter(Node.network_id == network_id).all()
         edges = db.query(Edge).filter(Edge.network_id == network_id).all()
         
-        # 2. Build in-memory NetworkX DiGraph
-        G = nx.DiGraph()
-        for n in nodes:
-            G.add_node(
-                str(n.id), 
-                capacity=n.capacity, 
-                current_load=n.current_load, 
-                failure_threshold=n.failure_threshold,
-                population_served=n.population_served,
-                status=n.status,
-            )
-            
-        for e in edges:
-            src = str(e.source_id)
-            tgt = str(e.target_id)
-            G.add_edge(src, tgt, weight=e.weight, capacity=e.capacity, edge_type=e.edge_type)
-            if e.is_bidirectional:
-                G.add_edge(tgt, src, weight=e.weight, capacity=e.capacity, edge_type=e.edge_type)
-                
+        # 2. Build in-memory NetworkX DiGraph. The shared builder carries
+        #    node_type and geometry, which domain-aware propagation and
+        #    population deduplication both need.
+        G = build_graph(nodes, edges)
+
         # 3. Apply Scenario Modifications if present
         scenario = None
         if scenario_id:
@@ -130,22 +134,33 @@ def run_simulation_task(
             # Publish to Redis channel specific to this simulation
             get_redis_client().publish(f"sim_{simulation_id}", json.dumps(wave_data))
 
-        # 4. Run cascade engine
-        waves, eff_before, eff_after, pop_affected, stabilized = run_cascade(
-            G,
-            initial_failures,
-            max_waves=settings.max_cascade_waves,
-            on_wave_completed=on_wave
+        # 4. Run cascade engine against an explicitly isolated copy, so a
+        #    later scenario in this worker starts from a clean baseline rather
+        #    than from the degraded state this run leaves behind.
+        with isolated_graph(G) as G_run:
+            waves, eff_before, eff_after, pop_affected, stabilized = run_cascade(
+                G_run,
+                initial_failures,
+                max_waves=_setting("max_cascade_waves", 50),
+                on_wave_completed=on_wave,
+                enforce_edge_semantics=_setting("enforce_edge_semantics", True),
+            )
+
+        # 5. Population impact, deduplicated across overlapping service areas.
+        #    The cumulative set is published by the final wave, so it is read
+        #    rather than re-accumulated -- that re-accumulation is exactly how
+        #    cumulative and marginal sets got conflated downstream.
+        all_failed_ids = (
+            set(waves[-1].get("cumulative_failed_node_ids", []))
+            if waves
+            else set(initial_failures)
         )
-        
-        # 5. Calculate population impact with municipal cap and overlap detection
-        all_failed_ids = set(initial_failures)
-        for w in waves:
-            all_failed_ids.update(w.get("failed_node_ids", []))
         pop_impact = calculate_population_impact(all_failed_ids, G)
 
-        # 6. Save results to Postgres
-        total_failed = sum(len(w['failed_node_ids']) for w in waves)
+        # 6. Save results to Postgres. Marginal sets are disjoint by
+        #    construction (a node is latched on failure and never re-enters), so
+        #    summing them is the true total rather than a cumulative overcount.
+        total_failed = len(all_failed_ids)
         
         sim.waves = waves
         sim.total_failed = total_failed
@@ -154,6 +169,7 @@ def run_simulation_task(
         # intervention saturate the study-area cap, the capped figure is
         # identical for each and a real improvement would be invisible.
         sim.raw_population_affected = pop_impact["raw_population_affected"]
+        sim.deduplicated_population_affected = pop_impact["deduplicated_population_affected"]
         sim.study_area_population_cap = pop_impact["study_area_population_cap"]
         sim.is_population_capped = pop_impact["is_population_capped"]
         sim.has_unresolved_overlap = pop_impact["has_unresolved_overlap"]

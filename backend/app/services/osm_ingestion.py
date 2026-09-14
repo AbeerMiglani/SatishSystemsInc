@@ -14,8 +14,16 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from app.services.geo import to_geojson_position
+
 logger = logging.getLogger(__name__)
 OSM_NAMESPACE = uuid.UUID("6b3c31b8-8bc3-4ec1-a4e0-bb7a0e7f9f6a")
+
+#: OSM geometry is genuinely observed, but the capacities, loads and population
+#: figures attached to it here are not -- and data_quality is a single label for
+#: the whole record. "estimated" is therefore the honest one; the observed part
+#: is recorded separately in provenance.json.
+OSM_DATA_QUALITY = "estimated"
 
 
 def _require_osmnx() -> Any:
@@ -30,7 +38,19 @@ def _require_osmnx() -> Any:
 
 
 def _stable_id(kind: str, value: object) -> str:
-    return str(uuid.uuid5(OSM_NAMESPACE, f"{kind}:{value}"))
+    """A deterministic, RFC 4122 *version 4* UUID for an OSM feature.
+
+    The derivation is still uuid5, but the version and variant bits are stamped
+    to v4 afterwards. ``MitigationRecommendation`` types its node fields as
+    pydantic ``UUID4``, which rejects a v5 value and coerces it into an
+    unrelated surrogate -- so the API would report node IDs matching no node in
+    the network. ``app.services.recommendations._to_deterministic_uuid4``
+    documents the same hazard from the other side.
+    """
+    raw = bytearray(uuid.uuid5(OSM_NAMESPACE, f"{kind}:{value}").bytes)
+    raw[6] = (raw[6] & 0x0F) | 0x40  # version 4
+    raw[8] = (raw[8] & 0x3F) | 0x80  # variant RFC 4122
+    return str(uuid.UUID(bytes=bytes(raw)))
 
 
 def download_osm_road_data(
@@ -59,7 +79,10 @@ def download_osm_road_data(
                 "features": [
                     {
                         "type": "Feature",
-                        "geometry": {"type": "Point", "coordinates": [node["lng"], node["lat"]]},
+                        "geometry": {
+                            "type": "Point",
+                            "coordinates": to_geojson_position(node["lat"], node["lng"]),
+                        },
                         "properties": {key: value for key, value in node.items() if key not in {"lat", "lng"}},
                     }
                     for node in nodes
@@ -96,7 +119,9 @@ def _convert_graph(graph: Any, place: str) -> tuple[list[dict[str, Any]], list[d
             {
                 "id": node_ids[osmid],
                 "name": f"OSM Road Junction {osmid}",
+                "display_name": f"OSM Road Junction {osmid}",
                 "node_type": "road_junction",
+                # OSMnx stores latitude as y and longitude as x.
                 "lat": float(data["y"]),
                 "lng": float(data["x"]),
                 "capacity": 200.0,
@@ -104,8 +129,10 @@ def _convert_graph(graph: Any, place: str) -> tuple[list[dict[str, Any]], list[d
                 "failure_threshold": 1.0,
                 "population_served": 0,
                 "status": "operational",
+                "is_synthetic": False,
+                "data_source": "osm",
                 "name_source": "osm",
-                "data_quality": "observed_geometry_estimated_operations",
+                "data_quality": OSM_DATA_QUALITY,
             }
         )
 
@@ -136,6 +163,8 @@ def _convert_graph(graph: Any, place: str) -> tuple[list[dict[str, Any]], list[d
                 "weight": item["length"],
                 "capacity": 100.0,
                 "is_bidirectional": item["is_bidirectional"],
+                "is_synthetic": False,
+                "data_source": "osm",
             }
         )
     return nodes, edges

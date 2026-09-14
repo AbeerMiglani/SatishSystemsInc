@@ -1,16 +1,33 @@
 /**
- * ImpactSummary — the six headline metrics for the active simulation result.
- * Renders skeleton tiles while a run is in flight and em-dashes before any
- * result exists, matching the mockup's Impact Summary section.
+ * ImpactSummary — the headline answer to "how bad is this, and what now?".
+ *
+ * This used to render six tiles of equal weight, mixing the two numbers anyone
+ * needs first with engineering diagnostics: a raw efficiency figure to three
+ * decimals, a stabilization flag that only means something if you know what the
+ * wave guardrail is, and a wave count. For a first-time reader that is six
+ * things to rank before learning anything.
+ *
+ * Now three headline numbers carry the summary — assets offline, people
+ * affected, and the single recommended next step — and everything diagnostic
+ * moves into a collapsed drawer, where it stays available without competing.
  */
 import React, { useMemo } from "react";
 import { useSimulationStore } from "../stores/simulationStore";
-import { useNetworkTopology } from "../api/hooks";
+import { useMitigations, useNetworkTopology } from "../api/hooks";
 import { useUIStore } from "../stores/uiStore";
 import { comparablePopulation } from "../types";
 import { criticalServicesOffline, failedNodeIdsForResult } from "../utils/derive";
 import StatTile from "./shared/StatTile";
 import Section from "./shared/Section";
+import AdvancedDetails from "./shared/AdvancedDetails";
+
+const GRID: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(142px, 1fr))",
+  gap: 9,
+};
+
+const HEADLINE_LABELS = ["Assets offline", "People affected", "Recommended next step"];
 
 export default function ImpactSummary() {
   const result = useSimulationStore((s) => s.result);
@@ -18,18 +35,30 @@ export default function ImpactSummary() {
   const networkId = useUIStore((s) => s.networkId);
   const { data: topology } = useNetworkTopology(networkId);
 
+  const completedId = result && result.status === "completed" ? result.id : null;
+  const { data: mitigations } = useMitigations(completedId, 1);
+  const topMitigation = mitigations?.[0];
+
   const critical = useMemo(() => {
     if (!result || !topology?.nodes) return null;
     return criticalServicesOffline(topology.nodes, failedNodeIdsForResult(result));
   }, [result, topology]);
 
-  const state = isRunning ? "Computing" : result ? (result.status === "completed" ? "Simulated" : result.status === "failed" ? "Stale" : "Computing") : "—";
+  const state = isRunning
+    ? "Computing"
+    : result
+    ? result.status === "completed"
+      ? "Simulated"
+      : result.status === "failed"
+      ? "Stale"
+      : "Computing"
+    : "—";
 
   if (isRunning) {
     return (
       <Section title="Impact summary" state={state}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(142px, 1fr))", gap: 9 }}>
-          {["Failed assets", "Population affected", "Critical services", "Cascade waves", "Cascade stabilized", "Network efficiency"].map((label) => (
+        <div style={GRID}>
+          {HEADLINE_LABELS.map((label) => (
             <StatTile key={label} label={label} value="" sub="Computing" provenance="muted" loading />
           ))}
         </div>
@@ -40,61 +69,105 @@ export default function ImpactSummary() {
   if (!result || result.status !== "completed") {
     return (
       <Section title="Impact summary" state={state}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(142px, 1fr))", gap: 9 }}>
-          <StatTile label="Failed assets" value="—" sub="Awaiting simulation" provenance="muted" />
-          <StatTile label="Population affected" value="—" sub="Awaiting simulation" provenance="muted" />
-          <StatTile label="Critical services" value="—" sub="Awaiting simulation" provenance="muted" />
-          <StatTile label="Cascade waves" value="—" sub="Awaiting simulation" provenance="muted" />
-          <StatTile label="Cascade stabilized" value="—" sub="Awaiting simulation" provenance="muted" />
-          <StatTile label="Network efficiency" value="—" sub="Awaiting simulation" provenance="muted" />
+        <div style={GRID}>
+          {HEADLINE_LABELS.map((label) => (
+            <StatTile key={label} label={label} value="—" sub="Awaiting simulation" provenance="muted" />
+          ))}
         </div>
       </Section>
     );
   }
 
   const uncapped = comparablePopulation(result);
+  const deduplicated = result.deduplicated_population_affected;
+
+  // Say which figure this is. "Capped" and "deduplicated" mean different
+  // things and the reader cannot tell them apart from the number alone.
   const popSub = result.is_population_capped
-    ? `capped · ${uncapped.toLocaleString()} uncapped`
-    : `of the study area`;
+    ? `capped at the study-area total`
+    : deduplicated != null
+    ? `overlapping service areas counted once`
+    : `service areas may overlap`;
+
+  // One next step, in plain language, taken straight from the engine's own
+  // domain-aware mitigation rather than restated here.
+  const nextStep = topMitigation
+    ? topMitigation.action_label || `Harden ${topMitigation.display_name ?? topMitigation.node_name}`
+    : result.total_failed > 0
+    ? "No single intervention helps"
+    : "No action needed";
+  const nextStepSub = topMitigation
+    ? `prevents ${topMitigation.failures_prevented} further failure${topMitigation.failures_prevented === 1 ? "" : "s"}`
+    : result.total_failed > 0
+    ? "see the mitigations panel"
+    : "nothing went offline";
 
   return (
     <Section title="Impact summary" state={state}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(142px, 1fr))", gap: 9 }}>
+      <div style={GRID}>
         <StatTile
-          label="Failed assets"
+          label="Assets offline"
           value={String(result.total_failed)}
-          sub={topology?.nodes ? `of ${topology.nodes.length} assets` : undefined}
+          sub={topology?.nodes ? `of ${topology.nodes.length} in the network` : undefined}
           provenance="simulated"
           color={result.total_failed > 0 ? "var(--rp-wave-0)" : undefined}
         />
         <StatTile
-          label="Population affected"
+          label="People affected"
           value={result.population_affected_estimate.toLocaleString()}
           sub={popSub}
           provenance="estimated"
         />
         <StatTile
-          label="Critical services"
-          value={critical != null ? String(critical) : "—"}
-          sub={critical ? `${critical} hospital${critical === 1 ? "" : "s"} offline` : "all hospitals online"}
-          provenance="derived"
-          color={critical ? "var(--rp-wave-2)" : "var(--rp-ok)"}
-        />
-        <StatTile label="Cascade waves" value={String(result.waves.length)} sub="wave 0 → last" provenance="simulated" />
-        <StatTile
-          label="Cascade stabilized"
-          value={result.cascade_stabilized === false ? "No" : result.cascade_stabilized === true ? "Yes" : "—"}
-          sub={result.cascade_stabilized === false ? "guardrail reached" : "no further spread"}
-          provenance="derived"
-          color={result.cascade_stabilized === false ? "var(--rp-wave-2)" : "var(--rp-ok)"}
-        />
-        <StatTile
-          label="Network efficiency"
-          value={result.global_efficiency_after != null ? result.global_efficiency_after.toFixed(3) : "—"}
-          sub={result.global_efficiency_before != null ? `from ${result.global_efficiency_before.toFixed(3)} baseline` : undefined}
-          provenance="derived"
+          label="Recommended next step"
+          value={nextStep}
+          sub={nextStepSub}
+          provenance={topMitigation ? "simulated" : "muted"}
+          color={topMitigation ? "var(--rp-teal-bright)" : undefined}
         />
       </div>
+
+      <AdvancedDetails hint={`${result.waves.length} waves · efficiency`}>
+        <div style={GRID}>
+          <StatTile
+            label="Critical services"
+            value={critical != null ? String(critical) : "—"}
+            sub={critical ? `${critical} hospital${critical === 1 ? "" : "s"} offline` : "all hospitals online"}
+            provenance="derived"
+            color={critical ? "var(--rp-wave-2)" : "var(--rp-ok)"}
+          />
+          <StatTile label="Cascade waves" value={String(result.waves.length)} sub="wave 0 → last" provenance="simulated" />
+          <StatTile
+            label="Cascade stabilized"
+            value={result.cascade_stabilized === false ? "No" : result.cascade_stabilized === true ? "Yes" : "—"}
+            sub={result.cascade_stabilized === false ? "guardrail reached" : "no further spread"}
+            provenance="derived"
+            color={result.cascade_stabilized === false ? "var(--rp-wave-2)" : "var(--rp-ok)"}
+          />
+          <StatTile
+            label="Network efficiency"
+            value={result.global_efficiency_after != null ? result.global_efficiency_after.toFixed(3) : "—"}
+            sub={result.global_efficiency_before != null ? `from ${result.global_efficiency_before.toFixed(3)} baseline` : undefined}
+            provenance="derived"
+          />
+          <StatTile
+            label="Population, deduplicated"
+            value={deduplicated != null ? deduplicated.toLocaleString() : "—"}
+            sub={
+              deduplicated != null
+                ? `${uncapped.toLocaleString()} before overlap resolution`
+                : "no service geometry available"
+            }
+            provenance="estimated"
+          />
+          <StatTile
+            label="Population, additive"
+            value={uncapped.toLocaleString()}
+            sub="uncapped sum; may double-count"
+            provenance="estimated"
+          />
+        </div>
+      </AdvancedDetails>
     </Section>
   );
 }

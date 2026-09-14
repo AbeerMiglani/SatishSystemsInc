@@ -64,7 +64,25 @@ export interface Network {
 // ---------------------------------------------------------------------------
 export interface CascadeWave {
   wave: number;
+  /**
+   * The MARGINAL set: assets that newly failed in this wave, not the running
+   * total. Always present, including on results recorded before the explicit
+   * fields below existed.
+   */
   failed_node_ids: string[];
+  /** Same as `failed_node_ids`, named so the distinction cannot be misread. */
+  marginal_failed_node_ids?: string[];
+  /**
+   * Everything failed up to AND INCLUDING this wave. Published by the engine so
+   * consumers stop re-accumulating it themselves — which is how cumulative
+   * totals kept leaking into per-wave figures and inflating failure velocity.
+   */
+  cumulative_failed_node_ids?: string[];
+}
+
+/** The assets that newly failed in one wave, whichever fields the record carries. */
+export function marginalFailures(wave: CascadeWave): string[] {
+  return wave.marginal_failed_node_ids ?? wave.failed_node_ids;
 }
 
 export interface SimulationResult {
@@ -82,6 +100,12 @@ export interface SimulationResult {
    * improvement would otherwise be invisible.
    */
   raw_population_affected?: number | null;
+  /**
+   * Population total with overlapping service areas resolved, so each resident
+   * is counted once. Null when the assets carry no service geometry, in which
+   * case `raw_population_affected` is an additive sum that may double-count.
+   */
+  deduplicated_population_affected?: number | null;
   study_area_population_cap?: number;
   is_population_capped?: boolean;
   has_unresolved_overlap?: boolean;
@@ -126,6 +150,16 @@ export interface MitigationRecommendation {
   efficiency_gain: number;
   protects_critical_services?: boolean;
   verified?: boolean;
+  /** Why the target asset failed: initial_shock, overload, or <service>_dependency_severed. */
+  root_cause?: string;
+  /** Plain-language root cause, ready to render verbatim. */
+  root_cause_detail?: string;
+  /** Domain-aware mitigation class, e.g. backup_generator, reroute, redundant_feeder. */
+  mitigation_kind?: string;
+  /** Plain-language recommended action, ready to render verbatim. */
+  action_label?: string;
+  /** True when the intervention reconnects the target to a surviving source. */
+  restores_supply_path?: boolean;
   scenario_payload: {
     network_id: string;
     name: string;
