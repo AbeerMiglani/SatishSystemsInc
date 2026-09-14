@@ -18,10 +18,146 @@ from pydantic import UUID4, BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from app.models.network import Edge, Node, SimulationResult
-from app.simulation.cascade import calculate_global_efficiency, run_cascade
+from app.services.graph_build import build_graph
+from app.simulation.cascade import (
+    _build_supplier_index,
+    calculate_global_efficiency,
+    run_cascade,
+)
 from app.simulation.population import calculate_population_impact
 
 logger = logging.getLogger(__name__)
+
+
+#: Domain-aware mitigations, keyed by (asset class, severed service).
+#:
+#: A generic "upgrade this node's capacity" is not an action anyone can take in
+#: the field. What a hospital that lost its feeders needs is a generator; what a
+#: blocked junction needs is a diversion. The engine already knows both the
+#: asset class and which service was severed, so it can say which.
+MITIGATION_PLAYBOOK: dict[tuple[str, str], tuple[str, str]] = {
+    ("hospital", "power"): ("backup_generator", "Deploy backup generator at {name}"),
+    ("hospital", "water"): ("water_tanker", "Dispatch water tankers to {name}"),
+    ("hospital", "transit"): ("reroute", "Reroute emergency access to {name}"),
+    ("water_station", "power"): ("backup_generator", "Deploy backup generator at {name}"),
+    ("telecom_tower", "power"): ("backup_power", "Install backup battery bank at {name}"),
+    ("power_substation", "power"): ("redundant_feeder", "Add a redundant feeder into {name}"),
+    ("road_junction", "transit"): ("reroute", "Reroute logistics traffic around {name}"),
+}
+
+#: Fallback when the asset class and severed service are not in the playbook.
+DEFAULT_MITIGATIONS: dict[str, tuple[str, str]] = {
+    "upgrade_node": ("capacity_upgrade", "Increase capacity headroom at {name}"),
+    "add_edge": ("redundant_link", "Add a redundant link into {name}"),
+}
+
+_SERVICE_LABELS = {
+    "power": "Power",
+    "water": "Water",
+    "transit": "Transit",
+}
+
+
+def surviving_source_reach(G: nx.DiGraph, failed: set[str]) -> set[str]:
+    """Nodes still connected to a working source over surviving assets only.
+
+    A "source" is a surviving strongly-connected component that nothing
+    surviving feeds from outside -- generation at the head of the network, or a
+    self-sustaining island. Everything reachable downstream of one still has a
+    continuous supply path; everything else is stranded, however healthy it
+    looks in isolation.
+
+    This is what the redundancy search was missing. It scored a candidate source
+    by whether it happened to survive (``is_survivor``) and then used that only
+    as a *sort preference*, never a filter -- so it would cheerfully propose
+    feeding a hospital from a substation that had itself lost every upstream
+    feed, and credit the intervention with a recovery that could not happen.
+
+    One reverse-free BFS over the condensation, O(V+E) per call, rather than a
+    path query per candidate pair.
+    """
+    alive = {str(n) for n in G.nodes if str(n) not in failed}
+    if not alive:
+        return set()
+    H = G.subgraph(alive)
+
+    roots: set[str] = set()
+    for component in nx.strongly_connected_components(H):
+        # Fed from outside the component by a survivor => not a source itself.
+        if any(p not in component for n in component for p in H.predecessors(n)):
+            continue
+        # Nor is an asset that *lost* its supply a source. Without this an
+        # island stranded by the very failure under study -- a substation whose
+        # only feeder just died -- would be read as generation, and the search
+        # would happily propose it as the donor for a redundancy link it has no
+        # power to carry.
+        if any(
+            str(p) in failed
+            for n in component
+            for p in G.predecessors(n)
+        ):
+            continue
+        roots |= {str(n) for n in component}
+
+    if not roots:
+        # Every surviving asset is fed by another surviving asset, so nothing
+        # distinguishes a source. Refusing every candidate here would be worse
+        # than not filtering: fall back to "no information" rather than "no".
+        return alive
+
+    seen = set(roots)
+    frontier = sorted(roots)
+    while frontier:
+        u = frontier.pop()
+        for v in H.successors(u):
+            v = str(v)
+            if v not in seen:
+                seen.add(v)
+                frontier.append(v)
+    return seen
+
+
+def diagnose_failure(
+    G: nx.DiGraph,
+    node_id: str,
+    failed: set[str],
+    initial_failures: set[str],
+    supplier_index: dict[str, dict[str, set[str]]] | None = None,
+) -> tuple[str, str]:
+    """Why this asset went down: (root_cause_code, plain-language explanation)."""
+    if node_id in initial_failures:
+        return ("initial_shock", "Directly hit by the initiating event")
+
+    index = supplier_index if supplier_index is not None else _build_supplier_index(G)
+    severed = sorted(
+        service
+        for service, suppliers in index.get(node_id, {}).items()
+        if suppliers and suppliers.issubset(failed)
+    )
+    if severed:
+        service = severed[0]
+        label = _SERVICE_LABELS.get(service, service.title())
+        return (
+            f"{service}_dependency_severed",
+            f"{label} edge severed — every upstream {service} supplier is offline",
+        )
+    return ("overload", "Overloaded by load shed from upstream failures")
+
+
+def _mitigation_for(
+    node_data: dict[str, Any],
+    root_cause: str,
+    intervention_type: str,
+    display_name: str,
+) -> tuple[str, str]:
+    """Pick the contextual mitigation for this asset and failure mode."""
+    node_type = str(node_data.get("node_type", ""))
+    service = root_cause.removesuffix("_dependency_severed") if "_dependency_severed" in root_cause else ""
+    entry = MITIGATION_PLAYBOOK.get((node_type, service))
+    if entry is None:
+        entry = DEFAULT_MITIGATIONS.get(intervention_type, DEFAULT_MITIGATIONS["upgrade_node"])
+    kind, template = entry
+    return kind, template.format(name=display_name)
 
 
 def _to_deterministic_uuid4(val: Any) -> uuid.UUID:
@@ -76,6 +212,24 @@ class MitigationRecommendation(BaseModel):
     verified: bool = Field(
         default=True, description="True if candidate was verified via in-memory simulation rerun"
     )
+    root_cause: str = Field(
+        default="overload",
+        description="Why the target asset failed: initial_shock, overload, or <service>_dependency_severed",
+    )
+    root_cause_detail: str = Field(
+        default="", description="Plain-language explanation of the root cause, for direct display"
+    )
+    mitigation_kind: str = Field(
+        default="capacity_upgrade",
+        description="Domain-aware mitigation class, e.g. backup_generator, reroute, redundant_feeder",
+    )
+    action_label: str = Field(
+        default="", description="Plain-language recommended action, ready to render verbatim"
+    )
+    restores_supply_path: bool = Field(
+        default=False,
+        description="True if the intervention reconnects the target to a surviving source over a continuous path",
+    )
     scenario_payload: dict[str, Any] = Field(
         description="Ready-to-post ScenarioCreate dictionary compatible with POST /api/scenarios"
     )
@@ -84,32 +238,16 @@ class MitigationRecommendation(BaseModel):
 
 
 def build_network_graph(network_id: str | uuid.UUID, db: Session) -> nx.DiGraph:
-    """Builds an in-memory NetworkX DiGraph from the database network topology."""
+    """Builds an in-memory NetworkX DiGraph from the database network topology.
+
+    Delegates to the shared builder so this graph and the Celery runner's are
+    the same graph. They used to be built separately and carried different node
+    attributes, which meant a candidate was scored against a topology that did
+    not quite match the one the baseline run had used.
+    """
     nodes = db.query(Node).filter(Node.network_id == network_id).all()
     edges = db.query(Edge).filter(Edge.network_id == network_id).all()
-
-    G = nx.DiGraph()
-    for n in nodes:
-        G.add_node(
-            str(n.id),
-            name=n.name,
-            display_name=getattr(n, "display_name", None) or n.name,
-            node_type=n.node_type,
-            capacity=float(n.capacity),
-            current_load=float(n.current_load),
-            failure_threshold=float(n.failure_threshold),
-            population_served=int(n.population_served),
-            status=n.status,
-        )
-
-    for e in edges:
-        src = str(e.source_id)
-        tgt = str(e.target_id)
-        G.add_edge(src, tgt, weight=float(e.weight), capacity=float(e.capacity), edge_type=e.edge_type)
-        if e.is_bidirectional:
-            G.add_edge(tgt, src, weight=float(e.weight), capacity=float(e.capacity), edge_type=e.edge_type)
-
-    return G
+    return build_graph(nodes, edges)
 
 
 def identify_candidate_nodes(
@@ -173,16 +311,21 @@ def resimulate_candidate(
     if node_id in G_cand.nodes:
         G_cand.nodes[node_id]["capacity"] = float(proposed_capacity)
 
-    waves_c, _, eff_after_c, raw_pop_c, _ = run_cascade(G_cand, initial_failures)
+    waves_c, _, eff_after_c, _raw_pop_c, _ = run_cascade(G_cand, initial_failures)
     cand_failed_count = sum(len(w.get("failed_node_ids", [])) for w in waves_c)
-
-    failures_prevented = baseline_failed_count - cand_failed_count
-    raw_population_saved = baseline_raw_pop - raw_pop_c
-    efficiency_gain = round(eff_after_c - baseline_efficiency, 5)
 
     all_failed_cand: set[str] = set()
     for w in waves_c:
         all_failed_cand.update(str(nid) for nid in w.get("failed_node_ids", []))
+
+    # Both sides of this subtraction must come from the same computation.
+    # The candidate figure used to be run_cascade's naive double-counting sum
+    # while the baseline came from calculate_population_impact, so
+    # "population saved" was a difference between two different quantities.
+    failures_prevented = baseline_failed_count - cand_failed_count
+    cand_pop = calculate_population_impact(all_failed_cand, G_baseline)["raw_population_affected"]
+    raw_population_saved = baseline_raw_pop - cand_pop
+    efficiency_gain = round(eff_after_c - baseline_efficiency, 5)
 
     protects_critical = False
     if baseline_failed_hospitals:
@@ -265,6 +408,12 @@ def get_recommendations(
         if nid in G_baseline.nodes and _is_hospital(G_baseline.nodes[nid])
     }
 
+    # Which services each asset cannot operate without, and which assets still
+    # have a continuous supply path to a working source. Both are computed once
+    # against the baseline outcome and reused for every candidate.
+    supplier_index = _build_supplier_index(G_baseline)
+    baseline_reach = surviving_source_reach(G_baseline, all_failed_ids)
+
     scored_candidates: list[dict[str, Any]] = []
 
     # --- 1. Candidate Generation: Node Upgrades (upgrade_node) ---
@@ -316,13 +465,21 @@ def get_recommendations(
             weight = float(orig_edge.get("weight", 1.0))
             capacity = float(orig_edge.get("capacity", 100.0))
 
-            # Identify candidate sources among surviving operational nodes
+            # Identify candidate sources among surviving operational nodes.
+            #
+            # The reachability filter is the fix for the single-point-of-failure
+            # blind spot: a node that survived but sits downstream of an
+            # unmitigated SPF has no supply to donate, so a redundancy link from
+            # it restores nothing. Previously survivorship was only a sort
+            # preference, so such a link could be proposed and credited.
             candidate_sources: list[tuple[int, int, float, str]] = []
             for src_cand, data in G_baseline.nodes(data=True):
                 src_cand_str = str(src_cand)
                 if src_cand_str in initial_set or src_cand_str == succ or src_cand_str == w1:
                     continue
                 if G_baseline.has_edge(src_cand_str, succ) or (src_cand_str, succ) in tested_edges:
+                    continue
+                if src_cand_str not in baseline_reach:
                     continue
 
                 is_survivor = 1 if src_cand_str not in all_failed_ids else 0
@@ -341,23 +498,35 @@ def get_recommendations(
                 G_cand = G_baseline.copy()
                 G_cand.add_edge(src_id, succ, weight=weight, capacity=capacity, edge_type=edge_type)
 
-                waves_c, _, eff_after_c, raw_pop_c, _ = run_cascade(G_cand, initial_failures)
+                waves_c, _, eff_after_c, _raw_pop_c, _ = run_cascade(G_cand, initial_failures)
                 cand_failed_count = sum(len(w.get("failed_node_ids", [])) for w in waves_c)
-
-                failures_prevented = baseline_failed_count - cand_failed_count
-                raw_population_saved = baseline_raw_pop - raw_pop_c
-                efficiency_gain = round(eff_after_c - baseline_efficiency, 5)
 
                 all_failed_cand: set[str] = set()
                 for w in waves_c:
                     all_failed_cand.update(str(nid) for nid in w.get("failed_node_ids", []))
+
+                failures_prevented = baseline_failed_count - cand_failed_count
+                cand_pop = calculate_population_impact(
+                    all_failed_cand, G_baseline
+                )["raw_population_affected"]
+                raw_population_saved = baseline_raw_pop - cand_pop
+                efficiency_gain = round(eff_after_c - baseline_efficiency, 5)
+
+                # Credit downstream recovery only when the target genuinely ends
+                # up on a continuous surviving path back to a working source.
+                cand_reach = surviving_source_reach(G_cand, all_failed_cand)
+                restores_supply_path = succ in cand_reach and succ not in all_failed_cand
 
                 protects_critical = False
                 if baseline_failed_hospitals:
                     survived = baseline_failed_hospitals - all_failed_cand
                     protects_critical = len(survived) > 0
 
-                if (
+                # A candidate that makes the cascade worse is never a mitigation,
+                # whatever it does for efficiency. This guard used to be absent,
+                # so an edge could be accepted and reported with a negative
+                # failures_prevented.
+                if failures_prevented >= 0 and (
                     failures_prevented > 0
                     or raw_population_saved > 0
                     or efficiency_gain > 0
@@ -375,6 +544,7 @@ def get_recommendations(
                         "raw_population_saved": raw_population_saved,
                         "efficiency_gain": efficiency_gain,
                         "protects_critical_services": protects_critical,
+                        "restores_supply_path": restores_supply_path,
                         "candidate_failed_count": cand_failed_count,
                         "candidate_efficiency": eff_after_c,
                     })
@@ -413,6 +583,13 @@ def get_recommendations(
             node_name = node_data.get("name") or display_name
             proposed_capacity = cand["proposed_capacity"]
 
+            root_cause, root_cause_detail = diagnose_failure(
+                G_baseline, node_id_str, all_failed_ids, initial_set, supplier_index
+            )
+            mitigation_kind, action_label = _mitigation_for(
+                node_data, root_cause, "upgrade_node", display_name
+            )
+
             scenario_payload = {
                 "network_id": net_id_str,
                 "name": f"Mitigation: Upgrade {display_name}"[:120],
@@ -447,6 +624,11 @@ def get_recommendations(
                     efficiency_gain=efficiency_gain,
                     protects_critical_services=protects_critical,
                     verified=True,
+                    root_cause=root_cause,
+                    root_cause_detail=root_cause_detail,
+                    mitigation_kind=mitigation_kind,
+                    action_label=action_label,
+                    restores_supply_path=bool(cand.get("restores_supply_path", False)),
                     scenario_payload=scenario_payload,
                 )
             )
@@ -465,6 +647,20 @@ def get_recommendations(
             edge_type = cand.get("edge_type", "power_supply")
             edge_weight = float(cand.get("weight", 1.0))
             edge_capacity = float(cand.get("capacity", 100.0))
+
+            # The asset with the problem is the destination: it is the one that
+            # lost its supply. The action is therefore described in terms of it,
+            # and names the surviving source that would feed it.
+            root_cause, root_cause_detail = diagnose_failure(
+                G_baseline, tgt_str, all_failed_ids, initial_set, supplier_index
+            )
+            mitigation_kind, action_label = _mitigation_for(
+                tgt_data, root_cause, "add_edge", tgt_display
+            )
+            if mitigation_kind in {"redundant_link", "redundant_feeder"}:
+                action_label = f"Feed {tgt_display} from {src_display} via a redundant {edge_type} link"
+            elif mitigation_kind == "reroute":
+                action_label = f"Reroute traffic for {tgt_display} via {src_display}"
 
             scenario_payload = {
                 "network_id": net_id_str,
@@ -504,6 +700,11 @@ def get_recommendations(
                     efficiency_gain=efficiency_gain,
                     protects_critical_services=protects_critical,
                     verified=True,
+                    root_cause=root_cause,
+                    root_cause_detail=root_cause_detail,
+                    mitigation_kind=mitigation_kind,
+                    action_label=action_label,
+                    restores_supply_path=bool(cand.get("restores_supply_path", False)),
                     scenario_payload=scenario_payload,
                 )
             )

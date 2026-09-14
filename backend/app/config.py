@@ -46,6 +46,25 @@ class Settings(BaseSettings):
     # marks the result non-stabilized; it never fails the simulation.
     max_cascade_waves: int = Field(default=50, ge=1, le=10_000)
 
+    # --- Cascade semantics ---
+    # When true the cascade respects what each link actually delivers, so a
+    # blocked road no longer de-energises an electrical tower while a hospital
+    # still requires both power and water. Disable to fall back to pure
+    # load-overload Motter-Lai propagation.
+    enforce_edge_semantics: bool = True
+
+    # --- Baseline topology source ---
+    # "synthetic" reads the committed seed fixture; "osm" pulls the real road
+    # network for `osm_place` through the OSMnx pipeline and ingests that
+    # instead. Everything downstream is unchanged either way: the graph is
+    # still built from the database, so the runner, the API and the map need
+    # no knowledge of where the topology came from.
+    topology_source: Literal["synthetic", "osm"] = "synthetic"
+    osm_place: str = "Manipal, Karnataka, India"
+    osm_network_type: str = "drive"
+    #: Where OSMnx output is cached, so a re-seed does not re-download.
+    osm_cache_dir: str = "/data/osm"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

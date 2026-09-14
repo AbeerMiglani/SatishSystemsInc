@@ -324,3 +324,51 @@ def calculate_centrality(
             logger.warning("centrality cache write failed", exc_info=True)
 
     return ranked_results
+
+
+def summarize_cascade_waves(waves: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Per-wave cascade metrics, derived strictly from marginal deltas.
+
+    Failure velocity is "how many assets went down in this wave", not "how many
+    were down by the end of it". Consumers that re-accumulated the wave lists
+    themselves kept conflating the two, which inflates the velocity curve into a
+    monotonically rising line that can never fall -- so a cascade that is
+    visibly slowing still reads as accelerating.
+
+    ``marginal_failed_node_ids`` and ``cumulative_failed_node_ids`` are published
+    by the engine, but results persisted before those keys existed carry only
+    ``failed_node_ids``. Those are marginal too, so the cumulative set is rebuilt
+    by accumulation here; nodes already seen in an earlier wave are subtracted,
+    so a legacy record that did store cumulative lists still yields correct
+    marginal counts rather than double counting.
+    """
+    summary: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    previous_marginal = 0
+
+    for index, wave in enumerate(waves):
+        raw_marginal = wave.get("marginal_failed_node_ids")
+        if raw_marginal is None:
+            raw_marginal = wave.get("failed_node_ids", [])
+        marginal = {str(nid) for nid in raw_marginal} - seen
+        seen |= marginal
+
+        declared_cumulative = wave.get("cumulative_failed_node_ids")
+        cumulative_count = (
+            len({str(nid) for nid in declared_cumulative})
+            if declared_cumulative is not None
+            else len(seen)
+        )
+
+        marginal_count = len(marginal)
+        summary.append({
+            "wave": wave.get("wave", index),
+            "marginal_count": marginal_count,
+            "cumulative_count": cumulative_count,
+            # Change in the rate of new failures: positive while the cascade is
+            # accelerating, negative once it starts to burn out.
+            "failure_velocity": marginal_count - previous_marginal,
+        })
+        previous_marginal = marginal_count
+
+    return summary

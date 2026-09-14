@@ -15,6 +15,17 @@ from sqlalchemy.orm import Session
 
 from app.db.neo4j import neo4j_session
 from app.models.network import Edge, Node
+from app.simulation.isolation import graph_fingerprint, isolated_graph
+
+#: Re-exported so persistence-side callers can reach the isolation helpers from
+#: the graph service they already import. The implementation lives in
+#: app.simulation.isolation so the engine keeps working without a DB driver.
+__all__ = [
+    "clear_network_from_neo4j",
+    "graph_fingerprint",
+    "isolated_graph",
+    "sync_network_to_neo4j",
+]
 
 
 def clear_network_from_neo4j(network_id: str) -> None:

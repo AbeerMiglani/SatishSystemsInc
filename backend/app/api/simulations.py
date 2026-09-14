@@ -2,18 +2,21 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import UUID4, BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.orm import Session
 
-from app.config import settings
 from app.db.postgres import get_db
 from app.models.network import Network, Node, Scenario, SimulationResult
+from app.schemas.simulation import SimulationCreate, SimulationResponse, WaveSchema
 from app.security import enforce_rate_limit, require_operator, require_viewer
 from app.services.recommendations import MitigationRecommendation, get_recommendations
 from app.simulation.runner import run_simulation_task
+
+#: Re-exported: these were declared inline here and had already drifted from
+#: app.schemas.simulation by two fields. There is now one definition, and this
+#: module is still the import site every existing caller and test expects.
+__all__ = ["SimulationCreate", "SimulationResponse", "WaveSchema", "router"]
 
 router = APIRouter(
     prefix="/simulations",
@@ -21,50 +24,6 @@ router = APIRouter(
     dependencies=[Depends(require_viewer), Depends(enforce_rate_limit)],
 )
 logger = logging.getLogger(__name__)
-
-
-class SimulationCreate(BaseModel):
-    network_id: UUID4
-    initial_failures: list[UUID4] = Field(min_length=1, max_length=settings.max_initial_failures)
-    scenario_id: UUID4 | None = None
-
-    @field_validator("initial_failures")
-    @classmethod
-    def initial_failures_must_be_unique(cls, values: list[UUID4]) -> list[UUID4]:
-        if len(set(values)) != len(values):
-            raise ValueError("initial_failures must not contain duplicates")
-        return values
-
-
-class WaveSchema(BaseModel):
-    wave: int
-    failed_node_ids: list[UUID4]
-
-
-class SimulationResponse(BaseModel):
-    id: UUID4
-    network_id: UUID4
-    status: str
-    initial_failures: list[UUID4]
-    waves: list[WaveSchema]
-    total_failed: int
-    population_affected_estimate: int
-    # Population provenance must reach the client: without these the UI cannot
-    # tell the user that a figure was capped, nor show a meaningful before/after
-    # when both runs saturate the cap. raw_population_affected is optional
-    # because rows predating the column have no recorded raw value.
-    raw_population_affected: int | None = None
-    study_area_population_cap: int = 65_000
-    is_population_capped: bool = False
-    has_unresolved_overlap: bool = False
-    cascade_stabilized: bool = True
-    global_efficiency_before: float | None = None
-    global_efficiency_after: float | None = None
-    error_message: str | None = None
-    created_at: datetime
-    completed_at: datetime | None = None
-
-    model_config = ConfigDict(from_attributes=True)
 
 
 @router.post("", response_model=SimulationResponse)
