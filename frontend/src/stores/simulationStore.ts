@@ -57,6 +57,17 @@ interface SimulationState {
   /** Timer ID for the animation interval */
   animationTimer: ReturnType<typeof setTimeout> | null;
 
+  /**
+   * Whether a simulation request is currently in flight (queued, running,
+   * or being polled) — set by whichever component triggered it
+   * (ControlPanel's baseline run, RecommendationPanel's apply/verify).
+   * Shared so the map overlay and impact summary can show a consistent
+   * loading state without each re-deriving it from their own hooks.
+   */
+  isRunning: boolean;
+  /** Message from the most recent failed run, or null. Cleared on the next run. */
+  runError: string | null;
+
   // History and scenario registry
   simulations: StoredSim[];
   scenarios: StoredScenario[];
@@ -69,6 +80,8 @@ interface SimulationState {
   registerScenario: (scenario: StoredScenario) => void;
   setBaselineSimulationId: (id: string | null) => void;
   setLastAppliedScenarioId: (id: string | null) => void;
+  setRunning: (running: boolean) => void;
+  setRunError: (message: string | null) => void;
   advanceWave: () => void;
   play: () => void;
   pause: () => void;
@@ -86,6 +99,9 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   failedNodeIds: new Set(),
   isPlaying: false,
   animationTimer: null,
+
+  isRunning: false,
+  runError: null,
 
   simulations: initialSims,
   scenarios: getInitialScenarios(),
@@ -129,6 +145,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       animationTimer: null,
       simulations: updatedSims,
       baselineSimulationId: newBaselineId,
+      isRunning: false,
+      runError: result.status === "failed" ? get().runError : null,
     });
 
     if (result.status === "completed" && result.waves.length > 0) {
@@ -166,6 +184,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
 
   setBaselineSimulationId: (id) => set({ baselineSimulationId: id }),
   setLastAppliedScenarioId: (id) => set({ lastAppliedScenarioId: id }),
+  setRunning: (running) => set({ isRunning: running, runError: running ? null : get().runError }),
+  setRunError: (message) => set({ runError: message, isRunning: false }),
 
   advanceWave: () => {
     const { result, currentWave, failedNodeIds, animationTimer } = get();
@@ -221,6 +241,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       failedNodeIds: new Set(),
       isPlaying: false,
       animationTimer: null,
+      isRunning: false,
+      runError: null,
     });
   },
 

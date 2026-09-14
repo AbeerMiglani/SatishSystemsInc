@@ -37,7 +37,7 @@ export default function GraphView({ nodes, edges }: GraphViewProps) {
             width: 24,
             height: 24,
             "font-size": 8,
-            color: "#e2e8f0",
+            color: "#e6edf3",
             "text-valign": "bottom",
             "text-margin-y": 4,
           },
@@ -46,8 +46,8 @@ export default function GraphView({ nodes, edges }: GraphViewProps) {
           selector: "edge",
           style: {
             width: 2,
-            "line-color": "#475569",
-            "target-arrow-color": "#475569",
+            "line-color": "#4a5c70",
+            "target-arrow-color": "#4a5c70",
             "target-arrow-shape": "triangle",
             "curve-style": "bezier",
           },
@@ -55,7 +55,7 @@ export default function GraphView({ nodes, edges }: GraphViewProps) {
         {
           selector: ".failed",
           style: {
-            "background-color": "#ef4444",
+            "background-color": "#f04438",
             "border-width": 2,
             "border-color": "#7f1d1d",
           },
@@ -64,21 +64,21 @@ export default function GraphView({ nodes, edges }: GraphViewProps) {
           selector: ".selected",
           style: {
             "border-width": 3,
-            "border-color": "#38bdf8",
+            "border-color": "#94bce3", // --rp-accent
           },
         },
         {
           selector: ".redundancy",
           style: {
             "border-width": 3,
-            "border-color": "#10b981", // Emerald
+            "border-color": "#5cb2a6", // --rp-teal
           },
         },
         {
           selector: ".hovered",
           style: {
             "border-width": 2,
-            "border-color": "#facc15",
+            "border-color": "#e3a33f", // --rp-wave-2
           },
         },
       ],
@@ -151,5 +151,5 @@ export default function GraphView({ nodes, edges }: GraphViewProps) {
     });
   }, [selectedNodeIds, hoveredNodeId, failedNodeIds, mode, redundancyNodes]);
 
-  return <div ref={containerRef} style={{ width: "100%", height: "100%", background: "#0f172a" }} />;
+  return <div ref={containerRef} style={{ width: "100%", height: "100%", background: "var(--rp-bg)" }} />;
 }

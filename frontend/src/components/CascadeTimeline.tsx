@@ -45,29 +45,15 @@ export default function CascadeTimeline() {
 
   const scrubberValue = currentWave >= 0 ? currentWave : 0;
 
-  const waveLabel =
-    currentWave === -1
-      ? "Pre-cascade"
-      : `Wave ${currentWave + 1} / ${waveCount}`;
-
-  const btnStyle: React.CSSProperties = {
-    background: "#334155",
-    border: "none",
-    color: "#e2e8f0",
-    borderRadius: 4,
-    padding: "4px 10px",
-    fontSize: 13,
-    cursor: "pointer",
-    lineHeight: 1,
-  };
+  const waveLabel = currentWave === -1 ? "Pre-cascade" : `Wave ${currentWave + 1} / ${waveCount}`;
 
   return (
     <div
       style={{
         flexShrink: 0,
-        height: 48,
-        background: "#1e293b",
-        borderTop: "1px solid #334155",
+        height: 44,
+        background: "var(--rp-surface-2)",
+        borderTop: "1px solid var(--rp-divider)",
         display: "flex",
         alignItems: "center",
         gap: 8,
@@ -75,38 +61,29 @@ export default function CascadeTimeline() {
         userSelect: "none",
       }}
     >
-      {/* Rewind */}
-      <button style={btnStyle} onClick={() => rewindToStart()} title="Rewind to start">
+      <button className="rp-btn rp-btn-secondary" onClick={() => rewindToStart()} title="Rewind to start">
         ⏮
       </button>
-
-      {/* Step Back */}
-      <button style={btnStyle} onClick={handleStepBack} title="Step back">
+      <button className="rp-btn rp-btn-secondary" onClick={handleStepBack} title="Step back">
         ◀
       </button>
-
-      {/* Play / Pause */}
-      <button style={{ ...btnStyle, background: "#2563eb" }} onClick={handlePlayPause} title={isPlaying ? "Pause" : "Play"}>
+      <button className="rp-btn rp-btn-primary" onClick={handlePlayPause} title={isPlaying ? "Pause" : "Play"}>
         {isPlaying ? "⏸" : "▶"}
       </button>
-
-      {/* Step Forward */}
-      <button style={btnStyle} onClick={handleStepForward} title="Step forward">
+      <button className="rp-btn rp-btn-secondary" onClick={handleStepForward} title="Step forward">
         ▶|
       </button>
 
-      {/* Scrubber */}
       <input
         type="range"
         min={0}
         max={waveCount > 0 ? waveCount - 1 : 0}
         value={scrubberValue}
         onChange={(e) => setWave(Number(e.target.value))}
-        style={{ flex: 1, accentColor: "#3b82f6", cursor: "pointer" }}
+        style={{ flex: 1, accentColor: "var(--rp-accent)", cursor: "pointer" }}
       />
 
-      {/* Wave label */}
-      <span style={{ fontSize: 12, color: "#94a3b8", whiteSpace: "nowrap", minWidth: 110, textAlign: "right" }}>
+      <span style={{ fontSize: 11.5, color: "var(--rp-mute)", whiteSpace: "nowrap", minWidth: 110, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
         {waveLabel}
       </span>
     </div>
