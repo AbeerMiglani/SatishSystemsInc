@@ -25,6 +25,11 @@ jobs:
         run: |
           cd backend
           flake8 app tests
+          ruff check .
+      - name: Run Type Checking
+        run: |
+          cd backend
+          mypy app
       - name: Run Tests
         run: |
           cd backend

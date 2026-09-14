@@ -44,6 +44,7 @@ dev = [
     "pytest-asyncio>=0.23,<1",
     "httpx>=0.27,<1",
     "ruff>=0.5,<1",
+    "mypy>=1.10,<3",
 ]
 
 [tool.setuptools.packages.find]
@@ -53,6 +54,34 @@ where = ["."]
 target-version = "py312"
 line-length = 100
 
+[tool.ruff.lint.per-file-ignores]
+# Mirrors .flake8's per-file-ignores: test modules import fixtures/mocks
+# before patching sys.modules, so imports can't all sit at the top.
+"tests/*" = ["E402"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+
+[tool.mypy]
+python_version = "3.12"
+plugins = ["sqlalchemy.ext.mypy.plugin"]
+# Several deps (celery, networkx, osmnx) ship no type stubs.
+ignore_missing_imports = true
+
+# app/models/network.py's SQLAlchemy models predate the Mapped[]-typed
+# declarative style: instance attributes are declared as plain Column(...),
+# which the SQLAlchemy mypy plugin can only partially resolve, so the model
+# module itself needs an explicit annotation on Enum-typed columns
+# (var-annotated) and reads/writes on ORM instances elsewhere report a
+# spurious Column[Any] type rather than the underlying Python type
+# (assignment/arg-type). Migrating every model to Mapped[] would fix this
+# properly but is a repo-wide refactor, not a hardening change — these are
+# the modules where that instance-attribute mutation is concentrated.
+[[tool.mypy.overrides]]
+module = "app.models.network"
+disable_error_code = ["var-annotated"]
+
+[[tool.mypy.overrides]]
+module = ["app.simulation.runner", "app.api.simulations", "app.services.recommendations"]
+disable_error_code = ["assignment", "arg-type"]

@@ -292,7 +292,7 @@ def calculate_centrality(
         try:
             cached = get_redis_client().get(cache_key)
             if cached:
-                return json.loads(cached)
+                return json.loads(str(cached))
         except Exception:
             logger.warning("centrality cache read failed", exc_info=True)
 

@@ -65,10 +65,24 @@ app.include_router(scenarios_router, prefix="/api")
 app.include_router(ws_router, prefix="/api")
 
 
+@app.get("/health/live")
+def liveness_check():
+    """
+    Liveness probe: the process is up and serving requests.
+
+    Does not touch Postgres/Neo4j/Redis — unlike /health, this never fails
+    because a downstream datastore is briefly unreachable, which is the
+    behavior an orchestrator's liveness check (should this process be
+    restarted?) wants, as distinct from readiness (should it receive
+    traffic?).
+    """
+    return {"status": "ok"}
+
+
 @app.get("/health")
 def health_check():
     """
-    Health check endpoint.
+    Readiness check.
 
     Returns connectivity status for each backing service.
     """
