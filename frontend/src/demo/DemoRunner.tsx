@@ -58,6 +58,9 @@ export default function DemoRunner() {
   const beatIndex = useDemoStore((s) => s.beatIndex);
   const isAutoPlaying = useDemoStore((s) => s.isAutoPlaying);
   const runToken = useDemoStore((s) => s.runToken);
+  const recoveryStartIndex = useDemoStore((s) => s.recoveryStartIndex);
+  const hasRunRecovery = useDemoStore((s) => s.hasRunRecovery);
+  const pauseForRecovery = useDemoStore((s) => s.pauseForRecovery);
   const loadBeats = useDemoStore((s) => s.loadBeats);
   const goToBeat = useDemoStore((s) => s.goToBeat);
   const finish = useDemoStore((s) => s.finish);
@@ -181,19 +184,28 @@ export default function DemoRunner() {
     goToBeat(0, { auto: true });
   }, [phase, beats.length, beatIndex, goToBeat]);
 
-  // Auto-advance.
+  // Auto-advance, stopping at the act boundary.
   useEffect(() => {
     if (!isAutoPlaying || beatIndex < 0 || beats.length === 0) return;
     if (beatIndex >= beats.length - 1) {
       finish();
       return;
     }
+
+    // Collapse and recovery are two separate stories. Act 1 plays to the held
+    // peak and stops there; the restoration only runs when it is asked for.
+    const next = beatIndex + 1;
+    if (recoveryStartIndex >= 0 && next === recoveryStartIndex && !hasRunRecovery) {
+      const hold = setTimeout(() => pauseForRecovery(), BEAT_DURATION_MS[beats[beatIndex].kind]);
+      return () => clearTimeout(hold);
+    }
+
     const timer = setTimeout(
-      () => goToBeat(beatIndex + 1, { auto: true }),
+      () => goToBeat(next, { auto: true }),
       BEAT_DURATION_MS[beats[beatIndex].kind]
     );
     return () => clearTimeout(timer);
-  }, [isAutoPlaying, beatIndex, beats, goToBeat, finish]);
+  }, [isAutoPlaying, beatIndex, beats, goToBeat, finish, recoveryStartIndex, hasRunRecovery, pauseForRecovery]);
 
   return null;
 }

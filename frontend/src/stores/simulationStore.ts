@@ -64,6 +64,15 @@ interface SimulationState {
   restoredNodeIds: Set<string>;
   /** Index into the active recovery plan, or -1 when no recovery is applied. */
   recoveryStageIndex: number;
+  /**
+   * Assets that failed in a baseline but survive under an applied intervention.
+   *
+   * Distinct from `restoredNodeIds`: restored means "came back during recovery",
+   * saved means "never went down this time because of the change made". The map
+   * and graph ring these so the answer to "what did applying that actually do"
+   * is visible, not only tabular.
+   */
+  savedNodeIds: Set<string>;
   /** Whether the cascade animation is playing */
   isPlaying: boolean;
   /** Timer ID for the animation interval */
@@ -103,6 +112,8 @@ interface SimulationState {
   /** Show `restored` as back online; `stageIndex` is its position in the plan. */
   applyRecovery: (restored: Set<string>, stageIndex: number) => void;
   clearRecovery: () => void;
+  /** Mark the assets an intervention rescued, for the map/graph highlight. */
+  setSavedNodes: (saved: Set<string>) => void;
 }
 
 const initialSims = getInitialSimulations();
@@ -114,6 +125,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   failedNodeIds: new Set(),
   restoredNodeIds: new Set(),
   recoveryStageIndex: -1,
+  savedNodeIds: new Set(),
   isPlaying: false,
   animationTimer: null,
 
@@ -161,6 +173,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       failedNodeIds: new Set(),
       restoredNodeIds: new Set(),
       recoveryStageIndex: -1,
+      savedNodeIds: new Set(),
       isPlaying: false,
       animationTimer: null,
       simulations: updatedSims,
@@ -265,6 +278,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       failedNodeIds: new Set(),
       restoredNodeIds: new Set(),
       recoveryStageIndex: -1,
+      savedNodeIds: new Set(),
       isPlaying: false,
       animationTimer: null,
       isRunning: false,
@@ -336,4 +350,6 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   },
 
   clearRecovery: () => set({ restoredNodeIds: new Set(), recoveryStageIndex: -1 }),
+
+  setSavedNodes: (saved) => set({ savedNodeIds: new Set(saved) }),
 }));
