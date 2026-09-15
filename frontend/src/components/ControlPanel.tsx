@@ -5,6 +5,8 @@ import { useRunSimulation, useSimulationResult, useCreateScenario, useNetworkTop
 import type { InfraNode } from "../types";
 import { comparablePopulation } from "../types";
 import ProvenanceTag from "./shared/ProvenanceTag";
+import { UI_FLAGS } from "../config/uiFlags";
+import { useDemoStore } from "../demo/demoStore";
 
 const ControlPanel: React.FC = () => {
   const mode = useUIStore((s) => s.mode);
@@ -25,8 +27,18 @@ const ControlPanel: React.FC = () => {
     return map;
   }, [topology]);
 
-  const { result, reset, setSimulationResult, addSimulation, registerScenario, setRunning, setRunError } =
-    useSimulationStore();
+  // Per-field selectors, not `useSimulationStore()`. Subscribing to the whole
+  // store re-rendered this panel on every animation tick, because `currentWave`
+  // and `failedNodeIds` change together every 800ms during cascade playback.
+  const result = useSimulationStore((s) => s.result);
+  const runError = useSimulationStore((s) => s.runError);
+  const reset = useSimulationStore((s) => s.reset);
+  const setSimulationResult = useSimulationStore((s) => s.setSimulationResult);
+  const addSimulation = useSimulationStore((s) => s.addSimulation);
+  const registerScenario = useSimulationStore((s) => s.registerScenario);
+  const setRunning = useSimulationStore((s) => s.setRunning);
+  const setRunError = useSimulationStore((s) => s.setRunError);
+  const stopDemo = useDemoStore((s) => s.stop);
   const [dismissedSimulationIds, setDismissedSimulationIds] = useState<Set<string>>(new Set());
 
   const simMutation = useRunSimulation();
@@ -143,7 +155,21 @@ const ControlPanel: React.FC = () => {
     }
   };
 
-  const handleResetTimeline = () => {
+  /**
+   * Clears the board — every Clear control goes through this.
+   *
+   * The button beside "Simulate baseline" used to call `clearSelection` alone,
+   * a uiStore action that empties `selectedNodeIds` and touches nothing else.
+   * The simulation store kept the completed `result`, the `failedNodeIds` the
+   * map and graph colour from, the scrubber position and the running animation
+   * interval, so the cascade stayed painted on screen and the board visibly did
+   * not reset. `reset()` is the action that actually tears all of that down.
+   *
+   * Dismissing the result id first keeps the run in history and stops the
+   * polling effect below re-adopting it the moment it is cleared.
+   */
+  const handleClearBoard = () => {
+    stopDemo();
     if (result?.status === "completed") {
       setDismissedSimulationIds((prev) => {
         const next = new Set(prev);
@@ -151,34 +177,43 @@ const ControlPanel: React.FC = () => {
         return next;
       });
     }
+    clearSelection();
+    clearRedundancyNodes();
     reset();
   };
 
   const isRunning = simMutation.isPending || (polledResult && polledResult.status !== "completed" && polledResult.status !== "failed");
 
+  // There is something to clear whenever the board is showing anything at all,
+  // not just while nodes happen to be selected. Gating on the selection alone
+  // left Clear disabled with a full cascade still on the map.
+  const canClear = (selectedNodeIds.size > 0 || !!result || !!runError) && !isRunning;
+
   return (
     <div style={{ padding: 16, borderBottom: "1px solid var(--rp-divider)" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
         <h4 style={{ fontSize: 13.5, letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--rp-text)" }}>Simulation controls</h4>
-        <select
-          className="rp-btn rp-btn-secondary"
-          style={{ fontSize: 11.5, padding: "4px 8px" }}
-          value={mode}
-          onChange={(e) => setMode(e.target.value as any)}
-        >
-          <option value="default">Baseline</option>
-          <option value="add_redundancy">What-if: add redundancy</option>
-        </select>
+        {UI_FLAGS.whatIfRedundancyMode && (
+          <select
+            className="rp-btn rp-btn-secondary"
+            style={{ fontSize: 11.5, padding: "4px 8px" }}
+            value={mode}
+            onChange={(e) => setMode(e.target.value as any)}
+          >
+            <option value="default">Baseline</option>
+            <option value="add_redundancy">What-if: add redundancy</option>
+          </select>
+        )}
       </div>
 
-      {mode === "default" && (
+      {UI_FLAGS.manualFailureSelection && mode === "default" && (
         <div style={{ marginBottom: 12 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
             <span style={{ fontSize: 11.5, color: "var(--rp-mute)", fontWeight: 600 }}>
               Initial failures ({selectedNodeIds.size})
             </span>
             {selectedNodeIds.size > 0 && (
-              <button className="rp-btn rp-btn-ghost" style={{ fontSize: 11, padding: 0 }} onClick={clearSelection} disabled={!!isRunning}>
+              <button className="rp-btn rp-btn-ghost" style={{ fontSize: 11, padding: 0 }} onClick={handleClearBoard} disabled={!canClear}>
                 Clear all
               </button>
             )}
@@ -245,14 +280,19 @@ const ControlPanel: React.FC = () => {
               )}
               {isRunning ? "Running…" : "Simulate baseline"}
             </button>
-            <button className="rp-btn rp-btn-secondary" onClick={clearSelection} disabled={selectedNodeIds.size === 0 || !!isRunning}>
+            <button
+              className="rp-btn rp-btn-secondary"
+              onClick={handleClearBoard}
+              disabled={!canClear}
+              title="Clear the selection, the active result and the cascade on the map"
+            >
               Clear
             </button>
           </div>
         </div>
       )}
 
-      {mode === "add_redundancy" && (
+      {UI_FLAGS.whatIfRedundancyMode && mode === "add_redundancy" && (
         <div className="rp-blueprint" style={{ marginBottom: 12, padding: 12, background: "rgba(92,178,166,.06)", borderColor: "rgba(92,178,166,.4)" }}>
           <i className="rp-corner tl" />
           <i className="rp-corner br" />
@@ -305,7 +345,7 @@ const ControlPanel: React.FC = () => {
         <div style={{ padding: 10, background: "var(--rp-surface-3)", display: "flex", flexDirection: "column", gap: 3 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span style={{ fontSize: 12, color: "var(--rp-mute)" }}>Active result</span>
-            <button className="rp-btn rp-btn-ghost" style={{ fontSize: 10.5, padding: 0 }} onClick={handleResetTimeline}>
+            <button className="rp-btn rp-btn-ghost" style={{ fontSize: 10.5, padding: 0 }} onClick={handleClearBoard}>
               Clear
             </button>
           </div>

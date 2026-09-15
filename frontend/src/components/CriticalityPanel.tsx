@@ -3,6 +3,7 @@ import { useCentrality, useNetworkTopology } from "../api/hooks";
 import { useUIStore } from "../stores/uiStore";
 import type { CentralityScore, InfraNode } from "../types";
 import Section from "./shared/Section";
+import { UI_FLAGS } from "../config/uiFlags";
 
 const CriticalityPanel: React.FC = () => {
   const networkId = useUIStore((s) => s.networkId);
@@ -69,7 +70,7 @@ const CriticalityPanel: React.FC = () => {
   if (isLoading || !scores) {
     return (
       <Section title="Top critical nodes" state={isLoading ? "Loading" : "—"}>
-        {metricToggle}
+        {UI_FLAGS.criticalityMetricToggle && metricToggle}
         {isLoading && <div style={{ marginTop: 8, color: "var(--rp-mute)", fontSize: 12.5 }}>Loading criticality…</div>}
       </Section>
     );
@@ -84,7 +85,7 @@ const CriticalityPanel: React.FC = () => {
         <span style={{ fontSize: 11, color: "var(--rp-mute)" }}>
           {metric === "betweenness" ? "Shortest-path bottlenecks" : "Recursive connectivity"}
         </span>
-        {metricToggle}
+        {UI_FLAGS.criticalityMetricToggle && metricToggle}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {top10.map((s, i) => {

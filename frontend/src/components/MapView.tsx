@@ -84,6 +84,9 @@ export default function MapView({ nodes, edges }: MapViewProps) {
   const toggleNodeSelection = useUIStore((s) => s.toggleNodeSelection);
   const setHoveredNode = useUIStore((s) => s.setHoveredNode);
   const failedNodeIds = useSimulationStore((s) => s.failedNodeIds);
+  // Assets a demo's recovery phase has brought back. Painted green rather than
+  // simply reverting to their type colour, so "restored" reads as an event.
+  const restoredNodeIds = useSimulationStore((s) => s.restoredNodeIds);
   const mode = useUIStore((s) => s.mode);
   const redundancyNodes = useUIStore((s) => s.redundancyNodes);
   const result = useSimulationStore((s) => s.result);
@@ -145,10 +148,12 @@ export default function MapView({ nodes, edges }: MapViewProps) {
       getRadius: (d) => {
         const base = d.node_type === "road_junction" ? 30 : 50;
         if (failedNodeIds.has(d.id)) return base * pulseRadius;
+        if (restoredNodeIds.has(d.id)) return base * 1.25;
         return base;
       },
       getFillColor: (d: InfraNode) => {
         if (failedNodeIds.has(d.id)) return [239, 68, 68, 255];
+        if (restoredNodeIds.has(d.id)) return [79, 174, 131, 255];
         if (mode === "add_redundancy") {
           if (redundancyNodes.includes(d.id)) return [16, 185, 129, 255]; // Emerald
         } else {
@@ -161,11 +166,13 @@ export default function MapView({ nodes, edges }: MapViewProps) {
         if (mode === "add_redundancy" && redundancyNodes.includes(d.id)) return [255, 255, 255, 255];
         if (mode === "default" && selectedNodeIds.has(d.id)) return [255, 255, 255, 255];
         if (failedNodeIds.has(d.id)) return [127, 29, 29, 255];
+        if (restoredNodeIds.has(d.id)) return [214, 245, 228, 255];
         return [0, 0, 0, 100];
       },
       getLineWidth: (d: InfraNode) => {
         if (mode === "add_redundancy" && redundancyNodes.includes(d.id)) return 3;
         if (mode === "default" && selectedNodeIds.has(d.id)) return 3;
+        if (restoredNodeIds.has(d.id)) return 2;
         return 1;
       },
       pickable: true,
@@ -183,10 +190,10 @@ export default function MapView({ nodes, edges }: MapViewProps) {
       },
       radiusUnits: "meters" as const,
       updateTriggers: {
-        getRadius: [failedNodeIds, pulseRadius],
-        getFillColor: [selectedNodeIds, hoveredNodeId, failedNodeIds, mode, redundancyNodes],
-        getLineColor: [selectedNodeIds, failedNodeIds, mode, redundancyNodes],
-        getLineWidth: [selectedNodeIds, mode, redundancyNodes],
+        getRadius: [failedNodeIds, restoredNodeIds, pulseRadius],
+        getFillColor: [selectedNodeIds, hoveredNodeId, failedNodeIds, restoredNodeIds, mode, redundancyNodes],
+        getLineColor: [selectedNodeIds, failedNodeIds, restoredNodeIds, mode, redundancyNodes],
+        getLineWidth: [selectedNodeIds, restoredNodeIds, mode, redundancyNodes],
       },
     });
 
@@ -247,7 +254,7 @@ export default function MapView({ nodes, edges }: MapViewProps) {
     });
 
     deckRef.current.setProps({ layers: [edgeLayer, blastLayer, nodeLayer] });
-  }, [nodes, edges, failedNodeIds, selectedNodeIds, hoveredNodeId, pulseRadius, nodeById, toggleNodeSelection, setHoveredNode, mode, redundancyNodes, showRoads]);
+  }, [nodes, edges, failedNodeIds, restoredNodeIds, selectedNodeIds, hoveredNodeId, pulseRadius, nodeById, toggleNodeSelection, setHoveredNode, mode, redundancyNodes, showRoads]);
 
   // Initialize MapLibre + deck.gl
   useEffect(() => {
