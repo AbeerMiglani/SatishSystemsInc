@@ -19,6 +19,7 @@ export default function GraphView({ nodes, edges }: GraphViewProps) {
   const setHoveredNode = useUIStore((s) => s.setHoveredNode);
   const failedNodeIds = useSimulationStore((s) => s.failedNodeIds);
   const restoredNodeIds = useSimulationStore((s) => s.restoredNodeIds);
+  const savedNodeIds = useSimulationStore((s) => s.savedNodeIds);
   const mode = useUIStore((s) => s.mode);
   const redundancyNodes = useUIStore((s) => s.redundancyNodes);
 
@@ -68,6 +69,14 @@ export default function GraphView({ nodes, edges }: GraphViewProps) {
             "background-color": "#4fae83", // --rp-ok
             "border-width": 2,
             "border-color": "#d6f5e4",
+          },
+        },
+        {
+          // Kept online by an applied intervention.
+          selector: ".saved",
+          style: {
+            "border-width": 3,
+            "border-color": "#7fd0a8", // --rp-teal-bright
           },
         },
         {
@@ -156,11 +165,12 @@ export default function GraphView({ nodes, edges }: GraphViewProps) {
       const id = n.id();
       n.toggleClass("failed", failedNodeIds.has(id));
       n.toggleClass("restored", restoredNodeIds.has(id));
+      n.toggleClass("saved", savedNodeIds.has(id));
       n.toggleClass("selected", mode === "default" && selectedNodeIds.has(id));
       n.toggleClass("redundancy", mode === "add_redundancy" && redundancyNodes.includes(id));
       n.toggleClass("hovered", id === hoveredNodeId);
     });
-  }, [selectedNodeIds, hoveredNodeId, failedNodeIds, restoredNodeIds, mode, redundancyNodes]);
+  }, [selectedNodeIds, hoveredNodeId, failedNodeIds, restoredNodeIds, savedNodeIds, mode, redundancyNodes]);
 
   return <div ref={containerRef} style={{ width: "100%", height: "100%", background: "var(--rp-bg)" }} />;
 }

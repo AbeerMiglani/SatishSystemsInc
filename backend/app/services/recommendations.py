@@ -17,6 +17,7 @@ import networkx as nx
 from pydantic import UUID4, BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.models.network import Edge, Node, SimulationResult
 from app.services.graph_build import build_graph
 from app.simulation.cascade import (
@@ -27,6 +28,24 @@ from app.simulation.cascade import (
 from app.simulation.population import calculate_population_impact
 
 logger = logging.getLogger(__name__)
+
+
+def _setting(name: str, default):
+    """Read a setting defensively.
+
+    A duplicate of ``app.simulation.runner._setting`` rather than an import of
+    it: that module pulls in Celery, ``SessionLocal`` and Redis, none of which
+    this one depends on. The behaviour must stay identical -- the test suite
+    replaces ``app.config`` with a MagicMock, so a bare ``settings.x`` returns a
+    truthy Mock instead of a value, which for a bool setting silently reads as
+    "always on".
+    """
+    value = getattr(settings, name, default)
+    if isinstance(default, bool):
+        return value if isinstance(value, bool) else default
+    if isinstance(default, int):
+        return value if isinstance(value, int) else default
+    return value if isinstance(value, type(default)) else default
 
 
 #: Domain-aware mitigations, keyed by (asset class, severed service).
@@ -311,7 +330,18 @@ def resimulate_candidate(
     if node_id in G_cand.nodes:
         G_cand.nodes[node_id]["capacity"] = float(proposed_capacity)
 
-    waves_c, _, eff_after_c, _raw_pop_c, _ = run_cascade(G_cand, initial_failures)
+    # The same cascade model the runner used for the baseline this is
+    # differenced against (`runner.py:146` passes the same setting). Letting it
+    # default to False made `failures_prevented` subtract a load-overload-only
+    # rerun from a dependency-aware baseline, so a capacity upgrade appeared to
+    # rescue assets that had in fact lost every feeder -- capacity cannot help
+    # a severed dependency, but with the semantics off the engine could not see
+    # that and scored the candidate as a save.
+    waves_c, _, eff_after_c, _raw_pop_c, _ = run_cascade(
+        G_cand,
+        initial_failures,
+        enforce_edge_semantics=_setting("enforce_edge_semantics", True),
+    )
     cand_failed_count = sum(len(w.get("failed_node_ids", [])) for w in waves_c)
 
     all_failed_cand: set[str] = set()
@@ -498,7 +528,13 @@ def get_recommendations(
                 G_cand = G_baseline.copy()
                 G_cand.add_edge(src_id, succ, weight=weight, capacity=capacity, edge_type=edge_type)
 
-                waves_c, _, eff_after_c, _raw_pop_c, _ = run_cascade(G_cand, initial_failures)
+                # Same model as the baseline, for the reason at the upgrade_node
+                # call site above.
+                waves_c, _, eff_after_c, _raw_pop_c, _ = run_cascade(
+                    G_cand,
+                    initial_failures,
+                    enforce_edge_semantics=_setting("enforce_edge_semantics", True),
+                )
                 cand_failed_count = sum(len(w.get("failed_node_ids", [])) for w in waves_c)
 
                 all_failed_cand: set[str] = set()

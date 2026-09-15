@@ -17,6 +17,7 @@ import { useUIStore } from "../stores/uiStore";
 import { useNetworkTopology } from "../api/hooks";
 import type { InfraNode, MitigationRecommendation, SimulationResult } from "../types";
 import { comparablePopulation } from "../types";
+import { failedNodeIdsForResult } from "../utils/derive";
 import ProvenanceTag from "./shared/ProvenanceTag";
 import Banner from "./shared/Banner";
 import Section from "./shared/Section";
@@ -33,6 +34,55 @@ function interventionLabel(rec: MitigationRecommendation, nodeLookup: Map<string
   };
 }
 
+/**
+ * Plain-language description of what the scenario actually changed.
+ *
+ * The panel used to run a real scenario and a real rerun without ever telling
+ * the reader which asset was modified or how, so an intervention that changed
+ * nothing visible was indistinguishable from one that had not run.
+ */
+function describeModifications(
+  rec: MitigationRecommendation,
+  nodeLookup: Map<string, InfraNode>
+): string[] {
+  const nameOf = (id: string) =>
+    nodeLookup.get(id)?.display_name || nodeLookup.get(id)?.name || id.slice(0, 8);
+
+  return (rec.scenario_payload?.modifications ?? []).map((mod: any) => {
+    if (mod.type === "upgrade_node") {
+      const from = nodeLookup.get(mod.node_id)?.capacity;
+      const to = mod.capacity ?? rec.proposed_capacity;
+      const range = from != null && to != null ? `${from.toFixed(0)} → ${Number(to).toFixed(0)}` : `${to ?? "?"}`;
+      return `Capacity at ${nameOf(mod.node_id)}: ${range}`;
+    }
+    if (mod.type === "add_edge") {
+      // edge_type values are already noun phrases ("power_supply", "road_link"),
+      // so appending "link" unconditionally produced "New road link link".
+      const kind = String(mod.edge_type ?? "power_supply").replace(/_/g, " ");
+      const phrase = kind.endsWith("link") ? kind : `${kind} link`;
+      return `New ${phrase}: ${nameOf(mod.source)} → ${nameOf(mod.target)}`;
+    }
+    return `Modification: ${mod.type}`;
+  });
+}
+
+/**
+ * What the rerun changed, asset by asset.
+ *
+ * `saved` are assets that failed in the baseline and survive under the
+ * intervention. `newlyAffected` is the other direction, and it is not
+ * hypothetical: the engine can return a candidate whose failure *count* is
+ * unchanged while the identity of the failed assets differs, which is why a
+ * population figure can move with no change in the headline number.
+ */
+function interventionOutcome(baseline: SimulationResult, scenario: SimulationResult) {
+  const before = failedNodeIdsForResult(baseline);
+  const after = failedNodeIdsForResult(scenario);
+  const saved = [...before].filter((id) => !after.has(id));
+  const newlyAffected = [...after].filter((id) => !before.has(id));
+  return { saved, newlyAffected };
+}
+
 export default function RecommendationPanel() {
   const result = useSimulationStore((s) => s.result);
   const isRunning = useSimulationStore((s) => s.isRunning);
@@ -43,6 +93,7 @@ export default function RecommendationPanel() {
   const setLastAppliedScenarioId = useSimulationStore((s) => s.setLastAppliedScenarioId);
   const addSimulation = useSimulationStore((s) => s.addSimulation);
   const stopDemo = useDemoStore((s) => s.stop);
+  const setSavedNodes = useSimulationStore((s) => s.setSavedNodes);
   const networkId = useUIStore((s) => s.networkId);
   const { data: topology } = useNetworkTopology(networkId);
 
@@ -60,6 +111,15 @@ export default function RecommendationPanel() {
   const [verifying, setVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const [verified, setVerified] = useState<{ baseline: SimulationResult; scenario: SimulationResult } | null>(null);
+  // Which intervention was last actually applied, and what it did. Separate
+  // from `verified`, which drives the rank-1 compare table only: a one-click
+  // apply on an alternative is just as much an applied intervention and needs
+  // the same explanation, so both paths write here.
+  const [appliedOutcome, setAppliedOutcome] = useState<{
+    rec: MitigationRecommendation;
+    baseline: SimulationResult;
+    scenario: SimulationResult;
+  } | null>(null);
   const [showAlts, setShowAlts] = useState(false);
   const reviewing = !!reviewSnapshot;
 
@@ -149,6 +209,9 @@ export default function RecommendationPanel() {
       // The rerun replaces the shared result; stop any demo still applying beats.
       stopDemo();
       setSimulationResult(pollData);
+      // After adoption, not before: setSimulationResult clears the highlight.
+      setSavedNodes(new Set(interventionOutcome(reviewSnapshot.baseline, pollData).saved));
+      setAppliedOutcome({ rec: reviewSnapshot.rec, baseline: reviewSnapshot.baseline, scenario: pollData });
     } catch (err) {
       setVerifyError(err instanceof Error ? err.message : "Unknown error running the verified rerun.");
     } finally {
@@ -165,9 +228,12 @@ export default function RecommendationPanel() {
       return m;
     });
     try {
-      const pollData = await runInterventionSequence(rec, result);
+      const baselineBefore = result;
+      const pollData = await runInterventionSequence(rec, baselineBefore);
       stopDemo();
       setSimulationResult(pollData);
+      setSavedNodes(new Set(interventionOutcome(baselineBefore, pollData).saved));
+      setAppliedOutcome({ rec, baseline: baselineBefore, scenario: pollData });
       setApplied((prev) => new Set(prev).add(rec.rank));
     } catch (err) {
       setApplyErrors((prev) => new Map(prev).set(rec.rank, err instanceof Error ? err.message : "Unknown error."));
@@ -225,6 +291,11 @@ export default function RecommendationPanel() {
         const baselinePop = comparablePopulation(activeBaseline);
         const projectedFailed = activeBaseline.total_failed - activeRec.failures_prevented;
         const projectedPop = baselinePop - activeRec.raw_population_saved;
+        // Only meaningful once a rerun exists; the empty default keeps the
+        // outcome block's reads total without a null check at every use.
+        const outcome = appliedOutcome
+          ? interventionOutcome(appliedOutcome.baseline, appliedOutcome.scenario)
+          : { saved: [] as string[], newlyAffected: [] as string[] };
 
         return (
           <div className="rp-blueprint" style={{ padding: 13, display: "flex", flexDirection: "column", gap: 10, background: "var(--rp-surface-3)" }}>
@@ -236,7 +307,17 @@ export default function RecommendationPanel() {
               <span style={{ fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase", padding: "2px 7px", background: "var(--rp-accent)", color: "#0b0f14", fontWeight: 500 }}>
                 Rank 1
               </span>
-              <ProvenanceTag kind="verified" label="Verified by resimulation" />
+              {/* `verified` is local state, set only once a rerun has actually
+                  completed -- deliberately not the API's `verified` field, which
+                  is hardcoded true on every candidate. Until then these figures
+                  are an in-memory projection, and calling them verified
+                  contradicted both the "Pending" column below and
+                  buildExplanation's own wording in utils/derive. */}
+              {verified ? (
+                <ProvenanceTag kind="verified" label="Verified by resimulation" />
+              ) : (
+                <ProvenanceTag kind="derived" label="Projected · not yet rerun" />
+              )}
               {activeRec.protects_critical_services && <ProvenanceTag kind="estimated" label="Protects hospital" />}
             </div>
             <div>
@@ -259,7 +340,7 @@ export default function RecommendationPanel() {
                 <span style={{ fontFamily: "var(--rp-font-heading)", fontWeight: 600, fontSize: 24, color: "var(--rp-teal-bright)", fontVariantNumeric: "tabular-nums" }}>
                   −{activeRec.failures_prevented}
                 </span>
-                <ProvenanceTag kind="verified" />
+                <ProvenanceTag kind={verified ? "verified" : "derived"} label={verified ? undefined : "Projected"} />
               </div>
               <div style={{ padding: "9px 10px", background: "var(--rp-surface-3)", display: "flex", flexDirection: "column", gap: 2 }}>
                 <span style={{ fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--rp-mute)" }}>Population saved</span>
@@ -309,7 +390,7 @@ export default function RecommendationPanel() {
                     }}
                   >
                     <div style={{ fontFamily: "var(--rp-font-heading)", fontWeight: 600, fontSize: 12, color: verified ? "var(--rp-teal-bright)" : "var(--rp-mute)" }}>
-                      Verified rerun
+                      Verified
                     </div>
                     <ProvenanceTag kind={verified ? "verified" : "muted"} label={verified ? "Verified" : "Pending"} />
                   </div>
@@ -384,6 +465,88 @@ export default function RecommendationPanel() {
                   <Banner tone="error" action={<button className="rp-btn rp-btn-secondary" onClick={handleRunVerifiedRerun}>Retry</button>}>
                     {verifyError}
                   </Banner>
+                )}
+              </div>
+            )}
+
+            {appliedOutcome && (
+              <div
+                className="rp-blueprint"
+                style={{ padding: 11, display: "flex", flexDirection: "column", gap: 9, background: "var(--rp-surface-2)" }}
+              >
+                <i className="rp-corner tl" />
+                <i className="rp-corner br" />
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--rp-dim)" }}>
+                    What this intervention did
+                  </span>
+                  <ProvenanceTag kind="verified" label="Measured by rerun" />
+                </div>
+
+                {/* What was actually changed. Without this the reader sees two
+                    numbers move and has to infer the edit from the card title. */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                  {describeModifications(appliedOutcome.rec, nodeLookup).map((line, i) => (
+                    <span key={i} style={{ fontSize: 12, color: "var(--rp-text)", fontVariantNumeric: "tabular-nums" }}>
+                      {line}
+                    </span>
+                  ))}
+                </div>
+
+                {outcome.saved.length > 0 ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                    <span style={{ fontSize: 11.5, color: "var(--rp-text-dim)" }}>
+                      <strong style={{ color: "var(--rp-teal-bright)" }}>
+                        {outcome.saved.length} asset{outcome.saved.length === 1 ? "" : "s"} stayed online
+                      </strong>{" "}
+                      that failed in the baseline — ringed on the map.
+                    </span>
+                    <span style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                      {outcome.saved.map((id) => (
+                        <span
+                          key={id}
+                          style={{
+                            fontSize: 10.5,
+                            padding: "2px 6px",
+                            background: "rgba(127,208,168,.12)",
+                            border: "1px solid var(--rp-teal)",
+                            color: "var(--rp-teal-bright)",
+                          }}
+                        >
+                          {nodeLookup.get(id)?.display_name || nodeLookup.get(id)?.name || id.slice(0, 8)}
+                        </span>
+                      ))}
+                    </span>
+                  </div>
+                ) : (
+                  /* A finding, not a failure to render. Capacity cannot help an
+                     asset that lost every supplier, so a zero here is the
+                     engine being honest about this cascade. */
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <span style={{ fontSize: 11.5, color: "var(--rp-warn-soft)" }}>
+                      <strong>No assets were saved.</strong> The same {appliedOutcome.scenario.total_failed} assets went
+                      offline with this change in place.
+                    </span>
+                    {appliedOutcome.rec.root_cause_detail && (
+                      <span style={{ fontSize: 11.5, color: "var(--rp-mute)", lineHeight: 1.5 }}>
+                        {appliedOutcome.rec.root_cause_detail}
+                      </span>
+                    )}
+                    <div>
+                      <ProvenanceTag kind="derived" label="Measured · no change" />
+                    </div>
+                  </div>
+                )}
+
+                {outcome.newlyAffected.length > 0 && (
+                  <span style={{ fontSize: 11.5, color: "var(--rp-wave-2)" }}>
+                    {outcome.newlyAffected.length} asset{outcome.newlyAffected.length === 1 ? "" : "s"} failed that
+                    had not before:{" "}
+                    {outcome.newlyAffected
+                      .map((id) => nodeLookup.get(id)?.display_name || nodeLookup.get(id)?.name || id.slice(0, 8))
+                      .join(", ")}
+                    .
+                  </span>
                 )}
               </div>
             )}

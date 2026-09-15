@@ -10,6 +10,7 @@
 
 import React from "react";
 import { useDemoStore } from "../demo/demoStore";
+import { useSimulationStore } from "../stores/simulationStore";
 import { DEMO_PRESETS, presetById, type DemoPreset } from "../demo/presets";
 import ProvenanceTag from "./shared/ProvenanceTag";
 
@@ -91,6 +92,10 @@ export default function DemoBar() {
   const arm = useDemoStore((s) => s.arm);
   const stop = useDemoStore((s) => s.stop);
   const goToBeat = useDemoStore((s) => s.goToBeat);
+  const startRecovery = useDemoStore((s) => s.startRecovery);
+  const recoveryStartIndex = useDemoStore((s) => s.recoveryStartIndex);
+  const hasRunRecovery = useDemoStore((s) => s.hasRunRecovery);
+  const totalFailed = useSimulationStore((s) => s.result?.total_failed ?? 0);
 
   const preset = presetById(activePresetId);
   const currentBeat = beatIndex >= 0 ? beats[beatIndex] : undefined;
@@ -98,6 +103,9 @@ export default function DemoBar() {
   const narration = (() => {
     if (phase === "error") return error ?? "The demo could not be started.";
     if (phase === "arming") return preset ? preset.premise : "Preparing the scenario…";
+    if (phase === "awaiting-recovery") {
+      return `Collapse complete — ${totalFailed} assets offline. ${preset?.recoveryCaption ?? ""}`.trim();
+    }
     if (currentBeat) return currentBeat.caption;
     if (phase === "complete") return preset?.recoveryCaption ?? "Scenario complete.";
     return "Pick a scenario — it runs itself from there. The map and graph stay clickable throughout.";
@@ -108,11 +116,13 @@ export default function DemoBar() {
       case "arming":
         return "Computing cascade";
       case "collapse":
-        return "Collapse";
+        return "Act 1 · Collapse";
       case "peak":
-        return "Peak impact";
+        return "Act 1 · Peak impact";
+      case "awaiting-recovery":
+        return "Act 1 complete";
       case "recovery":
-        return "Recovery";
+        return "Act 2 · Recovery";
       case "complete":
         return "Complete · replay any beat";
       case "error":
@@ -127,7 +137,7 @@ export default function DemoBar() {
       ? "var(--rp-wave-0)"
       : phase === "recovery" || phase === "complete"
       ? "var(--rp-ok)"
-      : phase === "peak"
+      : phase === "peak" || phase === "awaiting-recovery"
       ? "var(--rp-wave-2)"
       : phase === "idle"
       ? "var(--rp-mute)"
@@ -176,6 +186,16 @@ export default function DemoBar() {
           {narration}
         </span>
 
+        {phase === "awaiting-recovery" && recoveryStartIndex >= 0 && (
+          <button
+            className="rp-btn rp-btn-primary"
+            onClick={startRecovery}
+            style={{ flexShrink: 0, background: "var(--rp-ok)", borderColor: "var(--rp-ok)", color: "#0b0f14" }}
+          >
+            ▶ Run restoration
+          </button>
+        )}
+
         {(phase === "recovery" || phase === "complete") && (
           <span
             title="The engine models collapse only. Restoration order is derived from the recorded cascade waves — upstream assets first, then whatever depended on them."
@@ -198,6 +218,9 @@ export default function DemoBar() {
           {beats.map((beat, i) => {
             const isCurrent = i === beatIndex;
             const isMilestone = beat.kind === "recovery" && beat.milestone !== null;
+            // Act 2 is not reachable from the rail until it has been run, so the
+            // rail cannot be used to skip the collapse it is meant to follow.
+            const locked = beat.kind === "recovery" && !hasRunRecovery;
             const tint =
               beat.kind === "recovery"
                 ? "var(--rp-ok)"
@@ -208,15 +231,17 @@ export default function DemoBar() {
               <button
                 key={i}
                 onClick={() => goToBeat(i)}
-                title={beat.caption}
+                disabled={locked}
+                title={locked ? "Run the restoration first" : beat.caption}
                 style={{
                   padding: "2px 9px",
                   fontSize: 10.5,
                   fontVariantNumeric: "tabular-nums",
-                  cursor: "pointer",
+                  cursor: locked ? "not-allowed" : "pointer",
+                  opacity: locked ? 0.4 : 1,
                   background: isCurrent ? tint : "var(--rp-surface-2)",
-                  color: isCurrent ? "#0b0f14" : isMilestone ? tint : "var(--rp-mute)",
-                  border: `1px solid ${isCurrent || isMilestone ? tint : "var(--rp-divider)"}`,
+                  color: isCurrent ? "#0b0f14" : isMilestone && !locked ? tint : "var(--rp-mute)",
+                  border: `1px solid ${isCurrent || (isMilestone && !locked) ? tint : "var(--rp-divider)"}`,
                   fontWeight: isCurrent || isMilestone ? 600 : 400,
                   fontFamily: "var(--rp-font-body)",
                 }}

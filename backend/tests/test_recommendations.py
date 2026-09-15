@@ -93,13 +93,19 @@ def test_clear_winner_ranks_first():
     _make_node(G, node_h, "Node H", capacity=6.0, current_load=5.0, population_served=200)
 
     # Topology edges
-    G.add_edge(node_a, node_b, weight=1.0, capacity=100.0, edge_type="power_supply")
-    G.add_edge(node_a, node_c, weight=1.0, capacity=100.0, edge_type="power_supply")
-    G.add_edge(node_b, node_d, weight=1.0, capacity=100.0, edge_type="power_supply")
-    G.add_edge(node_b, node_e, weight=1.0, capacity=100.0, edge_type="power_supply")
-    G.add_edge(node_b, node_f, weight=1.0, capacity=100.0, edge_type="power_supply")
-    G.add_edge(node_b, node_g, weight=1.0, capacity=100.0, edge_type="power_supply")
-    G.add_edge(node_c, node_h, weight=1.0, capacity=100.0, edge_type="power_supply")
+    # Load-redistribution fixture: `depends_on` carries load like any other
+    # edge but declares no critical service, so the only failure mechanism
+    # here is overload -- which is what this test is about. With
+    # `power_supply` these single-feed chains also fail by dependency
+    # severing, and a capacity upgrade cannot prevent that, so every
+    # candidate would correctly score zero and the ranking would go untested.
+    G.add_edge(node_a, node_b, weight=1.0, capacity=100.0, edge_type="depends_on")
+    G.add_edge(node_a, node_c, weight=1.0, capacity=100.0, edge_type="depends_on")
+    G.add_edge(node_b, node_d, weight=1.0, capacity=100.0, edge_type="depends_on")
+    G.add_edge(node_b, node_e, weight=1.0, capacity=100.0, edge_type="depends_on")
+    G.add_edge(node_b, node_f, weight=1.0, capacity=100.0, edge_type="depends_on")
+    G.add_edge(node_b, node_g, weight=1.0, capacity=100.0, edge_type="depends_on")
+    G.add_edge(node_c, node_h, weight=1.0, capacity=100.0, edge_type="depends_on")
 
     # Run baseline cascade
     waves, _, eff_a, _, _ = run_cascade(G, [node_a])
@@ -286,10 +292,16 @@ def test_protects_critical_services_hospital_priority():
     )
 
     # Topology: A -> B -> H (Hospital), A -> C -> P (Residential)
-    G.add_edge(node_a, node_b, weight=1.0, capacity=100.0, edge_type="power_supply")
-    G.add_edge(node_a, node_c, weight=1.0, capacity=100.0, edge_type="power_supply")
-    G.add_edge(node_b, node_h, weight=1.0, capacity=100.0, edge_type="power_supply")
-    G.add_edge(node_c, node_p, weight=1.0, capacity=100.0, edge_type="power_supply")
+    # Load-redistribution fixture: `depends_on` carries load like any other
+    # edge but declares no critical service, so the only failure mechanism
+    # here is overload -- which is what this test is about. With
+    # `power_supply` these single-feed chains also fail by dependency
+    # severing, and a capacity upgrade cannot prevent that, so every
+    # candidate would correctly score zero and the ranking would go untested.
+    G.add_edge(node_a, node_b, weight=1.0, capacity=100.0, edge_type="depends_on")
+    G.add_edge(node_a, node_c, weight=1.0, capacity=100.0, edge_type="depends_on")
+    G.add_edge(node_b, node_h, weight=1.0, capacity=100.0, edge_type="depends_on")
+    G.add_edge(node_c, node_p, weight=1.0, capacity=100.0, edge_type="depends_on")
 
     # Baseline cascade: A fails, sends 10 to B and 10 to C. Both B and C overload and fail.
     # Then B sends to H (fails), C sends to P (fails). All 5 nodes fail.

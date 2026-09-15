@@ -105,14 +105,20 @@ def test_stress_conflicting_candidate_priorities():
     make_node(G, x_id, "Substation X", capacity=6.0, current_load=5.0, population_served=50)
     make_node(G, y_id, "Substation Y", capacity=6.0, current_load=5.0, population_served=50)
 
-    G.add_edge(root, b_id, weight=1.0, capacity=100.0, edge_type="power_supply")
-    G.add_edge(root, c_id, weight=1.0, capacity=100.0, edge_type="power_supply")
-    G.add_edge(root, d_id, weight=1.0, capacity=100.0, edge_type="power_supply")
+    # Load-redistribution fixture: `depends_on` carries load like any other
+    # edge but declares no critical service, so the only failure mechanism
+    # here is overload -- which is what this test is about. With
+    # `power_supply` these single-feed chains also fail by dependency
+    # severing, and a capacity upgrade cannot prevent that, so every
+    # candidate would correctly score zero and the ranking would go untested.
+    G.add_edge(root, b_id, weight=1.0, capacity=100.0, edge_type="depends_on")
+    G.add_edge(root, c_id, weight=1.0, capacity=100.0, edge_type="depends_on")
+    G.add_edge(root, d_id, weight=1.0, capacity=100.0, edge_type="depends_on")
 
-    G.add_edge(b_id, h_id, weight=1.0, capacity=100.0, edge_type="power_supply")
-    G.add_edge(c_id, p_id, weight=1.0, capacity=100.0, edge_type="power_supply")
-    G.add_edge(d_id, x_id, weight=1.0, capacity=100.0, edge_type="power_supply")
-    G.add_edge(x_id, y_id, weight=1.0, capacity=100.0, edge_type="power_supply")
+    G.add_edge(b_id, h_id, weight=1.0, capacity=100.0, edge_type="depends_on")
+    G.add_edge(c_id, p_id, weight=1.0, capacity=100.0, edge_type="depends_on")
+    G.add_edge(d_id, x_id, weight=1.0, capacity=100.0, edge_type="depends_on")
+    G.add_edge(x_id, y_id, weight=1.0, capacity=100.0, edge_type="depends_on")
 
     waves, _, eff_a, _, _ = run_cascade(G, [root])
     total_failed = sum(len(w["failed_node_ids"]) for w in waves)
@@ -234,11 +240,17 @@ def test_stress_add_edge_candidate_validity_guarantees():
     make_node(G, surv_gen, "Surv Gen", capacity=200.0, current_load=5.0)
     make_node(G, surv_node, "Surv Node", capacity=200.0, current_load=5.0)
 
-    G.add_edge(gen, w1_failed, weight=1.0, capacity=100.0, edge_type="power_supply")
-    G.add_edge(w1_failed, succ1, weight=1.0, capacity=100.0, edge_type="power_supply")
-    G.add_edge(w1_failed, succ2, weight=1.0, capacity=100.0, edge_type="power_supply")
-    G.add_edge(surv_gen, surv_node, weight=1.0, capacity=100.0, edge_type="power_supply")
-    G.add_edge(surv_node, surv_gen, weight=1.0, capacity=100.0, edge_type="power_supply")
+    # Load-redistribution fixture: `depends_on` carries load like any other
+    # edge but declares no critical service, so the only failure mechanism
+    # here is overload -- which is what this test is about. With
+    # `power_supply` these single-feed chains also fail by dependency
+    # severing, and a capacity upgrade cannot prevent that, so every
+    # candidate would correctly score zero and the ranking would go untested.
+    G.add_edge(gen, w1_failed, weight=1.0, capacity=100.0, edge_type="depends_on")
+    G.add_edge(w1_failed, succ1, weight=1.0, capacity=100.0, edge_type="depends_on")
+    G.add_edge(w1_failed, succ2, weight=1.0, capacity=100.0, edge_type="depends_on")
+    G.add_edge(surv_gen, surv_node, weight=1.0, capacity=100.0, edge_type="depends_on")
+    G.add_edge(surv_node, surv_gen, weight=1.0, capacity=100.0, edge_type="depends_on")
 
     waves, _, eff_a, _, _ = run_cascade(G, [gen])
     sim = SimulationResult(
@@ -460,12 +472,25 @@ def test_stress_honest_rerun_oracle_exact_deltas():
     make_node(G, d, "Substation D", capacity=6.0, current_load=5.0, population_served=3000)
     make_node(G, h, "Hospital H", capacity=6.0, current_load=5.0, population_served=800, node_type="hospital")
 
-    G.add_edge(a, b, weight=1.0, capacity=100.0, edge_type="power_supply")
-    G.add_edge(a, c, weight=1.0, capacity=100.0, edge_type="power_supply")
-    G.add_edge(b, h, weight=1.0, capacity=100.0, edge_type="power_supply")
-    G.add_edge(c, d, weight=1.0, capacity=100.0, edge_type="power_supply")
+    # Load-redistribution fixture: `depends_on` carries load like any other
+    # edge but declares no critical service, so the only failure mechanism
+    # here is overload -- which is what this test is about. With
+    # `power_supply` these single-feed chains also fail by dependency
+    # severing, and a capacity upgrade cannot prevent that, so every
+    # candidate would correctly score zero and the ranking would go untested.
+    G.add_edge(a, b, weight=1.0, capacity=100.0, edge_type="depends_on")
+    G.add_edge(a, c, weight=1.0, capacity=100.0, edge_type="depends_on")
+    G.add_edge(b, h, weight=1.0, capacity=100.0, edge_type="depends_on")
+    G.add_edge(c, d, weight=1.0, capacity=100.0, edge_type="depends_on")
 
-    waves, _, eff_a, _, _ = run_cascade(G, [a])
+    # Both sides of every delta this test checks must come from the same cascade
+    # model, and that model must be the one production uses: `runner.py` passes
+    # `enforce_edge_semantics`, so the stored baseline is always dependency-aware.
+    # This oracle previously left the flag at its False default on both sides --
+    # self-consistent, but blind to the engine differencing a semantics-OFF
+    # candidate against a semantics-ON baseline, which is exactly the bug it
+    # exists to catch.
+    waves, _, eff_a, _, _ = run_cascade(G, [a], enforce_edge_semantics=True)
     total_failed_baseline = sum(len(w["failed_node_ids"]) for w in waves)
     all_failed_baseline = set()
     for w in waves:
@@ -505,8 +530,8 @@ def test_stress_honest_rerun_oracle_exact_deltas():
                     edge_type=mod.get("edge_type", "power_supply"),
                 )
 
-        # Independent rerun
-        cand_waves, _, eff_cand, _, _ = run_cascade(G_mod, [a])
+        # Independent rerun, under the same model as the baseline above.
+        cand_waves, _, eff_cand, _, _ = run_cascade(G_mod, [a], enforce_edge_semantics=True)
         cand_failed = set()
         for w in cand_waves:
             cand_failed.update(w["failed_node_ids"])

@@ -18,7 +18,16 @@ import { useSimulationStore } from "../stores/simulationStore";
 import type { DemoId } from "./presets";
 import type { RecoveryStage } from "./recovery";
 
-export type DemoPhase = "idle" | "arming" | "collapse" | "peak" | "recovery" | "complete" | "error";
+export type DemoPhase =
+  | "idle"
+  | "arming"
+  | "collapse"
+  | "peak"
+  /** Act 1 is done and the board is holding at peak, waiting to be told to recover. */
+  | "awaiting-recovery"
+  | "recovery"
+  | "complete"
+  | "error";
 
 export type DemoBeat =
   | { kind: "collapse"; waveIndex: number; label: string; caption: string }
@@ -57,10 +66,22 @@ interface DemoState {
    * "already dispatched for this preset" guard.
    */
   runToken: number;
+  /** Index of the first recovery beat, or -1 when this run has no recovery. */
+  recoveryStartIndex: number;
+  /**
+   * Whether act 2 has been started for this run. Collapse and recovery are two
+   * separate stories and auto-play stops between them, so the rail must not let
+   * a viewer skip into a restoration that has not been run.
+   */
+  hasRunRecovery: boolean;
 
   arm: (presetId: DemoId) => void;
   loadBeats: (beats: DemoBeat[], recoveryPlan: RecoveryStage[]) => void;
   goToBeat: (index: number, options?: { auto?: boolean }) => void;
+  /** End act 1: hold at peak instead of running on into the restoration. */
+  pauseForRecovery: () => void;
+  /** Begin act 2. */
+  startRecovery: () => void;
   finish: () => void;
   fail: (message: string) => void;
   stop: () => void;
@@ -80,6 +101,8 @@ export const useDemoStore = create<DemoState>((set, get) => ({
   error: null,
   isAutoPlaying: false,
   runToken: 0,
+  recoveryStartIndex: -1,
+  hasRunRecovery: false,
 
   arm: (presetId) =>
     set((state) => ({
@@ -91,9 +114,25 @@ export const useDemoStore = create<DemoState>((set, get) => ({
       error: null,
       isAutoPlaying: true,
       runToken: state.runToken + 1,
+      recoveryStartIndex: -1,
+      hasRunRecovery: false,
     })),
 
-  loadBeats: (beats, recoveryPlan) => set({ beats, recoveryPlan }),
+  loadBeats: (beats, recoveryPlan) =>
+    set({
+      beats,
+      recoveryPlan,
+      recoveryStartIndex: beats.findIndex((b) => b.kind === "recovery"),
+    }),
+
+  pauseForRecovery: () => set({ phase: "awaiting-recovery", isAutoPlaying: false }),
+
+  startRecovery: () => {
+    const { recoveryStartIndex } = get();
+    if (recoveryStartIndex < 0) return;
+    set({ hasRunRecovery: true });
+    get().goToBeat(recoveryStartIndex, { auto: true });
+  },
 
   goToBeat: (index, options) => {
     const { beats } = get();
@@ -129,6 +168,8 @@ export const useDemoStore = create<DemoState>((set, get) => ({
       beatIndex: -1,
       error: null,
       isAutoPlaying: false,
+      recoveryStartIndex: -1,
+      hasRunRecovery: false,
     });
   },
 }));
