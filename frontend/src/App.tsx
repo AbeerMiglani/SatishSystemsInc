@@ -120,7 +120,7 @@ const App: React.FC = () => {
   const log = useEventLog();
 
   const demoPhase = useDemoStore((s) => s.phase);
-  const isDemoRunning = demoPhase !== "idle" && demoPhase !== "error";
+  const isDemoRunning = demoPhase !== "idle" && demoPhase !== "error" && demoPhase !== "complete";
   const sidebarRef = useRef<HTMLDivElement>(null);
 
   // Bring the impact panels back into view on every phase change, so the

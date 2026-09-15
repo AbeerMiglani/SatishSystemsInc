@@ -102,7 +102,9 @@ export const useDemoStore = create<DemoState>((set, get) => ({
     applyBeat(beat);
     set({
       beatIndex: index,
-      phase: phaseForBeat(beat),
+      // A manual jump ends auto-play, and nothing would ever call finish()
+      // afterwards, so it lands the run in "complete" directly.
+      phase: options?.auto ? phaseForBeat(beat) : "complete",
       isAutoPlaying: options?.auto ?? false,
     });
   },

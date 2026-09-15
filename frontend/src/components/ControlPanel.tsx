@@ -105,6 +105,9 @@ const ControlPanel: React.FC = () => {
 
   const handleRunBaseline = () => {
     if (!networkId || selectedNodeIds.size === 0) return;
+    // A manual run replaces the shared result; a demo still narrating would
+    // keep applying its beats to it.
+    stopDemo();
     setRunning(true);
     simMutation.mutate({
       network_id: networkId,
@@ -142,6 +145,7 @@ const ControlPanel: React.FC = () => {
         created_at: scenario.created_at ?? new Date().toISOString(),
       });
 
+      stopDemo();
       setRunning(true);
       simMutation.mutate({
         network_id: networkId,
