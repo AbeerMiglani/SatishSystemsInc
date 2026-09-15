@@ -32,6 +32,12 @@ const HEADLINE_LABELS = ["Assets offline", "People affected", "Recommended next 
 export default function ImpactSummary() {
   const result = useSimulationStore((s) => s.result);
   const isRunning = useSimulationStore((s) => s.isRunning);
+  // Recovery state, so the headline numbers move while a demo walks the
+  // restoration rather than sitting frozen at peak impact.
+  const failedNodeIds = useSimulationStore((s) => s.failedNodeIds);
+  const restoredNodeIds = useSimulationStore((s) => s.restoredNodeIds);
+  const recoveryStageIndex = useSimulationStore((s) => s.recoveryStageIndex);
+  const currentWave = useSimulationStore((s) => s.currentWave);
   const networkId = useUIStore((s) => s.networkId);
   const { data: topology } = useNetworkTopology(networkId);
 
@@ -81,6 +87,14 @@ export default function ImpactSummary() {
   const uncapped = comparablePopulation(result);
   const deduplicated = result.deduplicated_population_affected;
 
+  const isRecovering = recoveryStageIndex >= 0;
+  const restoredPercent = Math.round((restoredNodeIds.size / Math.max(1, result.total_failed)) * 100);
+
+  // Mid-cascade the headline counts what is actually red on the map, not the
+  // final total. A summary that reads "11 offline" while wave 0 has taken down
+  // two of them is describing a different moment than the one being animated.
+  const isMidCascade = !isRecovering && currentWave >= 0 && currentWave < result.waves.length - 1;
+
   // Say which figure this is. "Capped" and "deduplicated" mean different
   // things and the reader cannot tell them apart from the number alone.
   const popSub = result.is_population_capped
@@ -106,25 +120,54 @@ export default function ImpactSummary() {
     <Section title="Impact summary" state={state}>
       <div style={GRID}>
         <StatTile
-          label="Assets offline"
-          value={String(result.total_failed)}
-          sub={topology?.nodes ? `of ${topology.nodes.length} in the network` : undefined}
-          provenance="simulated"
-          color={result.total_failed > 0 ? "var(--rp-wave-0)" : undefined}
+          label={isRecovering ? "Still offline" : isMidCascade ? "Offline so far" : "Assets offline"}
+          value={String(isRecovering || isMidCascade ? failedNodeIds.size : result.total_failed)}
+          sub={
+            isRecovering
+              ? `down from ${result.total_failed} at peak`
+              : isMidCascade
+              ? `wave ${currentWave + 1} of ${result.waves.length} — ${result.total_failed} at peak`
+              : topology?.nodes
+              ? `of ${topology.nodes.length} in the network`
+              : undefined
+          }
+          provenance={isRecovering || isMidCascade ? "derived" : "simulated"}
+          color={
+            isRecovering
+              ? failedNodeIds.size === 0
+                ? "var(--rp-ok)"
+                : "var(--rp-wave-2)"
+              : result.total_failed > 0
+              ? "var(--rp-wave-0)"
+              : undefined
+          }
         />
         <StatTile
           label="People affected"
           value={result.population_affected_estimate.toLocaleString()}
-          sub={popSub}
+          sub={isRecovering ? `at peak impact — ${popSub}` : popSub}
           provenance="estimated"
         />
-        <StatTile
-          label="Recommended next step"
-          value={nextStep}
-          sub={nextStepSub}
-          provenance={topMitigation ? "simulated" : "muted"}
-          color={topMitigation ? "var(--rp-teal-bright)" : undefined}
-        />
+        {/* During recovery the "next step" tile gives way to the restoration
+            progress: it is what the narration is describing, and the
+            recommendation is unchanged by a repair that has not happened yet. */}
+        {isRecovering ? (
+          <StatTile
+            label="Restored"
+            value={`${restoredPercent}%`}
+            sub={`${restoredNodeIds.size} of ${result.total_failed} assets back online`}
+            provenance="derived"
+            color="var(--rp-ok)"
+          />
+        ) : (
+          <StatTile
+            label="Recommended next step"
+            value={nextStep}
+            sub={nextStepSub}
+            provenance={topMitigation ? "simulated" : "muted"}
+            color={topMitigation ? "var(--rp-teal-bright)" : undefined}
+          />
+        )}
       </div>
 
       <AdvancedDetails hint={`${result.waves.length} waves · efficiency`}>

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import "maplibre-gl/dist/maplibre-gl.css";
 import MapView from "./components/MapView";
 import GraphView from "./components/GraphView";
@@ -10,6 +10,11 @@ import CascadeTimeline from "./components/CascadeTimeline";
 import ImpactSummary from "./components/ImpactSummary";
 import WaveBreakdown from "./components/WaveBreakdown";
 import ExplainPanel from "./components/ExplainPanel";
+import DemoBar from "./components/DemoBar";
+import DemoRunner from "./demo/DemoRunner";
+import CollapsiblePane from "./components/shared/CollapsiblePane";
+import { UI_FLAGS } from "./config/uiFlags";
+import { useDemoStore } from "./demo/demoStore";
 import { useNetworks, useNetworkTopology } from "./api/hooks";
 import { useUIStore } from "./stores/uiStore";
 import { useSimulationStore } from "./stores/simulationStore";
@@ -28,6 +33,15 @@ const TONE_COLOR: Record<LogEntry["tone"], string> = {
   info: "var(--rp-accent)",
 };
 const TONE_ICON: Record<LogEntry["tone"], string> = { ok: "✓", warn: "!", err: "✕", info: "·" };
+
+/**
+ * Accent frame around the two panels the demo is narrating. Only while a demo
+ * is actually driving the board — a static border would just be chrome.
+ */
+const STORY_HIGHLIGHT = (active: boolean): React.CSSProperties => ({
+  borderLeft: `2px solid ${active ? "var(--rp-accent)" : "transparent"}`,
+  transition: "border-color 200ms ease",
+});
 
 function timeNow() {
   return new Date().toLocaleTimeString([], { hour12: false });
@@ -105,6 +119,18 @@ const App: React.FC = () => {
 
   const log = useEventLog();
 
+  const demoPhase = useDemoStore((s) => s.phase);
+  const isDemoRunning = demoPhase !== "idle" && demoPhase !== "error";
+  const sidebarRef = useRef<HTMLDivElement>(null);
+
+  // Bring the impact panels back into view on every phase change, so the
+  // numbers the narration is describing are the ones on screen. They are the
+  // first thing in the sidebar, so this is a scroll to the top.
+  useEffect(() => {
+    if (!isDemoRunning) return;
+    sidebarRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  }, [demoPhase, isDemoRunning]);
+
   if (isLoadingNetworks || isLoadingTopology || !topology) {
     return (
       <div className="rp-root" style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center" }}>
@@ -115,6 +141,12 @@ const App: React.FC = () => {
 
   return (
     <div className="rp-root" style={{ width: "100%", height: "100vh", display: "flex", flexDirection: "column" }}>
+      {/* Headless: owns the demo run and paces its beats. Renders nothing. */}
+      <DemoRunner />
+
+      {/* ---------- one-click demos ---------- */}
+      <DemoBar />
+
       {/* ---------- header ---------- */}
       <header
         style={{
@@ -204,28 +236,13 @@ const App: React.FC = () => {
 
       {/* ---------- main ---------- */}
       <main style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-        <div style={{ flex: 1, borderRight: "1px solid var(--rp-divider)", display: "flex", flexDirection: "column" }}>
-          <div
-            style={{
-              padding: "8px 16px",
-              background: "var(--rp-surface-2)",
-              borderBottom: "1px solid var(--rp-divider)",
-              fontFamily: "var(--rp-font-heading)",
-              fontWeight: 600,
-              fontSize: 12,
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              color: "var(--rp-dim)",
-            }}
-          >
-            Topology
-          </div>
-          <div style={{ flex: 1, position: "relative" }}>
-            <GraphView nodes={topology.nodes} edges={topology.edges} />
-          </div>
-        </div>
+        {/* Collapsed on load: the graph is for tinkering, the map carries the
+            story. It is one click and a drag away for anyone who wants it. */}
+        <CollapsiblePane title="Topology" defaultOpen={false} defaultWidth={380}>
+          <GraphView nodes={topology.nodes} edges={topology.edges} />
+        </CollapsiblePane>
 
-        <div style={{ flex: 1.5, position: "relative", borderRight: "1px solid var(--rp-divider)", display: "flex", flexDirection: "column" }}>
+        <div style={{ flex: 1, minWidth: 0, position: "relative", borderRight: "1px solid var(--rp-divider)", display: "flex", flexDirection: "column" }}>
           <div
             style={{
               padding: "8px 16px",
@@ -247,18 +264,26 @@ const App: React.FC = () => {
           <CascadeTimeline />
         </div>
 
-        <div style={{ width: 372, maxWidth: "100%", display: "flex", flexDirection: "column", background: "var(--rp-surface)", overflowY: "auto" }}>
+        {/* Impact and waves lead: they are what the demo is narrating, and they
+            should be readable without scrolling. The manual controls follow. */}
+        <div
+          ref={sidebarRef}
+          style={{ width: 372, maxWidth: "100%", flex: "none", display: "flex", flexDirection: "column", background: "var(--rp-surface)", overflowY: "auto" }}
+        >
+          <div style={STORY_HIGHLIGHT(isDemoRunning)}>
+            <ImpactSummary />
+            <WaveBreakdown />
+          </div>
           <ControlPanel />
-          <ImpactSummary />
-          <WaveBreakdown />
           <RecommendationPanel />
           <ExplainPanel />
-          <CriticalityPanel />
-          <ScenarioCompare />
+          {UI_FLAGS.criticalityPanel && <CriticalityPanel />}
+          {UI_FLAGS.scenarioComparePanel && <ScenarioCompare />}
         </div>
       </main>
 
       {/* ---------- footer: event log ---------- */}
+      {UI_FLAGS.eventLogFooter && (
       <footer style={{ flex: "none", background: "var(--rp-bg)", borderTop: "1px solid var(--rp-divider)", padding: "9px 16px 11px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 7 }}>
           <span style={{ fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--rp-dim)" }}>Event log</span>
@@ -298,6 +323,7 @@ const App: React.FC = () => {
           )}
         </div>
       </footer>
+      )}
     </div>
   );
 };

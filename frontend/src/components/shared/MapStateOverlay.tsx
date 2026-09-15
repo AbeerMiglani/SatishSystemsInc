@@ -50,10 +50,10 @@ export function EmptyMapState({ onRunDemo }: { onRunDemo?: () => void }) {
           <circle cx="12" cy="12" r="5.2" opacity={0.6} />
           <circle cx="12" cy="12" r="9.4" opacity={0.3} />
         </svg>
-        <h4 style={{ fontSize: 21 }}>No simulation selected</h4>
+        <h4 style={{ fontSize: 21 }}>Start with a demo</h4>
         <p style={{ margin: 0, fontSize: 12.5, color: "var(--rp-text-dim)", lineHeight: 1.55 }}>
-          Click an asset on the map or the topology graph to fail it, then run the simulation — or
-          load the deterministic demo scenario.
+          Press Demo 1, 2 or 3 at the top — each one runs a full cascade and its recovery on its
+          own. Or click assets here to pick your own failure points and simulate them.
         </p>
         {onRunDemo && (
           <button className="rp-btn rp-btn-primary" onClick={onRunDemo}>

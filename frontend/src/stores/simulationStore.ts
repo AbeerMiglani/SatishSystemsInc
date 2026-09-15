@@ -52,6 +52,18 @@ interface SimulationState {
   currentWave: number;
   /** Set of node IDs that are failed up to the current wave */
   failedNodeIds: Set<string>;
+  /**
+   * Assets shown as restored during a demo's recovery phase. Subtracted from
+   * `failedNodeIds`, so the map and graph need no extra wiring to show a
+   * cascade coming back — they simply stop seeing those ids as failed.
+   *
+   * The restoration order is derived client-side from the recorded waves (see
+   * `demo/recovery.ts`); the engine models collapse only. Every surface that
+   * renders it labels it as derived.
+   */
+  restoredNodeIds: Set<string>;
+  /** Index into the active recovery plan, or -1 when no recovery is applied. */
+  recoveryStageIndex: number;
   /** Whether the cascade animation is playing */
   isPlaying: boolean;
   /** Timer ID for the animation interval */
@@ -75,7 +87,7 @@ interface SimulationState {
   lastAppliedScenarioId: string | null;
 
   // Actions
-  setSimulationResult: (result: SimulationResult) => void;
+  setSimulationResult: (result: SimulationResult, options?: { autoplay?: boolean }) => void;
   addSimulation: (sim: StoredSim, isBaseline?: boolean) => void;
   registerScenario: (scenario: StoredScenario) => void;
   setBaselineSimulationId: (id: string | null) => void;
@@ -88,6 +100,9 @@ interface SimulationState {
   reset: () => void;
   setWave: (index: number) => void;
   rewindToStart: () => void;
+  /** Show `restored` as back online; `stageIndex` is its position in the plan. */
+  applyRecovery: (restored: Set<string>, stageIndex: number) => void;
+  clearRecovery: () => void;
 }
 
 const initialSims = getInitialSimulations();
@@ -97,6 +112,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   result: null,
   currentWave: -1,
   failedNodeIds: new Set(),
+  restoredNodeIds: new Set(),
+  recoveryStageIndex: -1,
   isPlaying: false,
   animationTimer: null,
 
@@ -108,7 +125,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   baselineSimulationId: initialBaseline,
   lastAppliedScenarioId: null,
 
-  setSimulationResult: (result) => {
+  setSimulationResult: (result, options) => {
+    const autoplay = options?.autoplay ?? true;
     const state = get();
     if (state.animationTimer) clearInterval(state.animationTimer);
 
@@ -141,6 +159,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       result,
       currentWave: -1,
       failedNodeIds: new Set(),
+      restoredNodeIds: new Set(),
+      recoveryStageIndex: -1,
       isPlaying: false,
       animationTimer: null,
       simulations: updatedSims,
@@ -149,7 +169,9 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       runError: result.status === "failed" ? get().runError : null,
     });
 
-    if (result.status === "completed" && result.waves.length > 0) {
+    // A demo run passes `autoplay: false` and paces the cascade itself, beat by
+    // beat, so the built-in animation must not also start and race it.
+    if (autoplay && result.status === "completed" && result.waves.length > 0) {
       setTimeout(() => get().play(), 300);
     }
   },
@@ -208,6 +230,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
     set({
       currentWave: nextWave,
       failedNodeIds: newFailed,
+      restoredNodeIds: new Set(),
+      recoveryStageIndex: -1,
     });
   },
 
@@ -239,6 +263,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       result: null,
       currentWave: -1,
       failedNodeIds: new Set(),
+      restoredNodeIds: new Set(),
+      recoveryStageIndex: -1,
       isPlaying: false,
       animationTimer: null,
       isRunning: false,
@@ -260,7 +286,15 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       }
     }
 
-    set({ currentWave: index, failedNodeIds: newFailed });
+    // Scrubbing back into the collapse always drops recovery state, so a
+    // rail jump from "70% restored" to "wave 2" cannot leave ghost-restored
+    // assets painted on the map.
+    set({
+      currentWave: index,
+      failedNodeIds: newFailed,
+      restoredNodeIds: new Set(),
+      recoveryStageIndex: -1,
+    });
   },
 
   rewindToStart: () => {
@@ -269,8 +303,37 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
     set({
       currentWave: -1,
       failedNodeIds: new Set(),
+      restoredNodeIds: new Set(),
+      recoveryStageIndex: -1,
       isPlaying: false,
       animationTimer: null,
     });
   },
+
+  applyRecovery: (restored, stageIndex) => {
+    const { result, animationTimer } = get();
+    if (!result || result.status !== "completed") return;
+    if (animationTimer) clearInterval(animationTimer);
+
+    // The cascade's full extent, then minus what has come back. Reusing the
+    // engine's own cumulative set rather than re-accumulating it here keeps
+    // this consistent with `failedNodeIdsForResult` in utils/derive.
+    const stillFailed = new Set<string>();
+    for (const wave of result.waves) {
+      for (const id of wave.failed_node_ids) stillFailed.add(id);
+    }
+    for (const id of result.initial_failures) stillFailed.add(id);
+    for (const id of restored) stillFailed.delete(id);
+
+    set({
+      currentWave: result.waves.length - 1,
+      failedNodeIds: stillFailed,
+      restoredNodeIds: new Set(restored),
+      recoveryStageIndex: stageIndex,
+      isPlaying: false,
+      animationTimer: null,
+    });
+  },
+
+  clearRecovery: () => set({ restoredNodeIds: new Set(), recoveryStageIndex: -1 }),
 }));
