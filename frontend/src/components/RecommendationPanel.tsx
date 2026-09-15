@@ -20,6 +20,7 @@ import { comparablePopulation } from "../types";
 import ProvenanceTag from "./shared/ProvenanceTag";
 import Banner from "./shared/Banner";
 import Section from "./shared/Section";
+import { useDemoStore } from "../demo/demoStore";
 
 function interventionLabel(rec: MitigationRecommendation, nodeLookup: Map<string, InfraNode>) {
   const isAddEdge = rec.intervention_type === "add_edge";
@@ -41,6 +42,7 @@ export default function RecommendationPanel() {
   const registerScenario = useSimulationStore((s) => s.registerScenario);
   const setLastAppliedScenarioId = useSimulationStore((s) => s.setLastAppliedScenarioId);
   const addSimulation = useSimulationStore((s) => s.addSimulation);
+  const stopDemo = useDemoStore((s) => s.stop);
   const networkId = useUIStore((s) => s.networkId);
   const { data: topology } = useNetworkTopology(networkId);
 
@@ -144,6 +146,8 @@ export default function RecommendationPanel() {
     try {
       const pollData = await runInterventionSequence(reviewSnapshot.rec, reviewSnapshot.baseline);
       setVerified({ baseline: reviewSnapshot.baseline, scenario: pollData });
+      // The rerun replaces the shared result; stop any demo still applying beats.
+      stopDemo();
       setSimulationResult(pollData);
     } catch (err) {
       setVerifyError(err instanceof Error ? err.message : "Unknown error running the verified rerun.");
@@ -162,6 +166,7 @@ export default function RecommendationPanel() {
     });
     try {
       const pollData = await runInterventionSequence(rec, result);
+      stopDemo();
       setSimulationResult(pollData);
       setApplied((prev) => new Set(prev).add(rec.rank));
     } catch (err) {
