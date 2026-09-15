@@ -370,29 +370,34 @@ export default function RecommendationPanel() {
 
             {(reviewing || verified) && (
               <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 2 }}>
+                {/* Header cells need minWidth: 0. A grid item defaults to
+                    min-width: auto, so it refuses to shrink below its content
+                    and any wide child pushes past the cell edge into the column
+                    beside it. The provenance pills were exactly that: at the
+                    372px sidebar these cells are 74px, and each pill overflowed
+                    by 16px. They now live on one line under the table instead of
+                    three pills competing across four narrow columns. */}
                 <div style={{ display: "grid", gridTemplateColumns: "minmax(90px,1.2fr) repeat(3, minmax(60px,1fr))", gap: 1, background: "var(--rp-divider)" }}>
-                  <div style={{ background: "var(--rp-surface-2)", padding: "7px 9px", fontSize: 9.5, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--rp-dim)" }}>
+                  <div style={{ background: "var(--rp-surface-2)", padding: "7px 9px", minWidth: 0, fontSize: 9.5, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--rp-dim)" }}>
                     Metric
                   </div>
-                  <div style={{ background: "var(--rp-surface-2)", padding: "7px 9px" }}>
+                  <div style={{ background: "var(--rp-surface-2)", padding: "7px 9px", minWidth: 0 }}>
                     <div style={{ fontFamily: "var(--rp-font-heading)", fontWeight: 600, fontSize: 12 }}>Baseline</div>
-                    <ProvenanceTag kind="simulated" />
                   </div>
-                  <div style={{ background: "var(--rp-surface-2)", padding: "7px 9px" }}>
+                  <div style={{ background: "var(--rp-surface-2)", padding: "7px 9px", minWidth: 0 }}>
                     <div style={{ fontFamily: "var(--rp-font-heading)", fontWeight: 600, fontSize: 12 }}>Proposed</div>
-                    <ProvenanceTag kind="estimated" />
                   </div>
                   <div
                     style={{
                       background: verified ? "rgba(79,174,131,.12)" : "var(--rp-surface-2)",
                       padding: "7px 9px",
+                      minWidth: 0,
                       borderLeft: `1px solid ${verified ? "rgba(79,174,131,.4)" : "var(--rp-divider)"}`,
                     }}
                   >
                     <div style={{ fontFamily: "var(--rp-font-heading)", fontWeight: 600, fontSize: 12, color: verified ? "var(--rp-teal-bright)" : "var(--rp-mute)" }}>
                       Verified
                     </div>
-                    <ProvenanceTag kind={verified ? "verified" : "muted"} label={verified ? "Verified" : "Pending"} />
                   </div>
 
                   <div style={{ background: "var(--rp-surface-3)", padding: "8px 9px", fontSize: 11.5, color: "var(--rp-text-dim)" }}>Failed assets</div>
@@ -438,6 +443,16 @@ export default function RecommendationPanel() {
                   >
                     {verified ? comparablePopulation(verified.scenario).toLocaleString() : "pending"}
                   </div>
+                </div>
+
+                {/* One provenance line for the whole table, replacing a pill per
+                    column. Says the same thing in the space the columns cannot
+                    spare, and tracks whether the rerun has actually happened. */}
+                <div style={{ fontSize: 10.5, color: "var(--rp-faint)", lineHeight: 1.5 }}>
+                  <strong style={{ color: "var(--rp-mute)", fontWeight: 600 }}>Baseline</strong> simulated ·{" "}
+                  <strong style={{ color: "var(--rp-wave-2)", fontWeight: 600 }}>Proposed</strong> estimated ·{" "}
+                  <strong style={{ color: verified ? "var(--rp-teal-bright)" : "var(--rp-mute)", fontWeight: 600 }}>Verified</strong>{" "}
+                  {verified ? "measured by rerun" : "pending — not yet rerun"}
                 </div>
 
                 {!verified && (
