@@ -110,8 +110,3 @@ class SimulationResponse(BaseModel):
     completed_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
-
-
-class SimulationResult(SimulationResponse):
-    """Schema representation of a completed simulation result."""
-    pass

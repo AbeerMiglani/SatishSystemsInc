@@ -21,7 +21,12 @@ __all__ = ["SimulationCreate", "SimulationResponse", "WaveSchema", "router"]
 router = APIRouter(
     prefix="/simulations",
     tags=["Simulations"],
-    dependencies=[Depends(require_viewer), Depends(enforce_rate_limit)],
+    # Rate limit runs before auth: FastAPI resolves dependencies in order and
+    # stops at the first exception, so an auth check listed first would let a
+    # bad or missing API key 401 before the limiter ever saw the request --
+    # unlimited-rate key brute forcing. The limiter has to see every request
+    # regardless of whether it turns out to be authenticated.
+    dependencies=[Depends(enforce_rate_limit), Depends(require_viewer)],
 )
 logger = logging.getLogger(__name__)
 

@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import path from "path";
 
@@ -27,5 +27,10 @@ export default defineConfig({
         ws: true,
       },
     },
+  },
+  test: {
+    // Pure-logic coverage only (stores, derivations) — no jsdom/RTL yet, so
+    // the default "node" environment is enough and keeps this fast.
+    include: ["src/**/*.test.ts"],
   },
 });

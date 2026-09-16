@@ -3,7 +3,6 @@ from .simulation import (
     PopulationImpactResult,
     SimulationCreate,
     SimulationResponse,
-    SimulationResult,
     WaveSchema,
 )
 
@@ -15,6 +14,5 @@ __all__ = [
     "PopulationImpactResult",
     "SimulationCreate",
     "SimulationResponse",
-    "SimulationResult",
     "WaveSchema",
 ]
