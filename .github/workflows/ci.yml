@@ -48,6 +48,10 @@ jobs:
         run: |
           cd frontend
           npm ci
+      - name: Run Tests
+        run: |
+          cd frontend
+          npm test
       - name: Run Type Check & Build
         run: |
           cd frontend

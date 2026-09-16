@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from app import models as _models  # noqa: F401  # Ensure models are registered before create_tables
+from app import models as _models  # noqa: F401  # Registers ORM mappers before any relationship is resolved
 from app.api.networks import router as networks_router
 from app.api.scenarios import router as scenarios_router
 from app.api.simulations import router as simulations_router
@@ -27,15 +27,27 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     # Schema creation is performed by the explicit Alembic migration job. Do
     # not start an API process that can return misleading partial availability.
-    service_health = {
+    #
+    # Postgres and Redis are hard dependencies -- nothing in the API can serve
+    # a meaningful response without them. Neo4j is soft: it is read by exactly
+    # one feature, criticality centrality, and calculate_centrality (see
+    # app.services.analytics) already falls back to an in-process NetworkX
+    # computation when Neo4j is unreachable. Refusing to start the whole
+    # process over that one degradable feature meant a Neo4j hiccup took down
+    # simulations, scenarios and everything else that never touches it.
+    required_health = {
         "postgres": verify_postgres_connection(),
-        "neo4j": verify_neo4j_connection(),
         "redis": verify_redis_connection(),
     }
-    unavailable = [name for name, healthy in service_health.items() if not healthy]
+    unavailable = [name for name, healthy in required_health.items() if not healthy]
     if unavailable:
         logger.error("startup dependency check failed: %s", ", ".join(unavailable))
         raise RuntimeError(f"required services unavailable: {', '.join(unavailable)}")
+    if not verify_neo4j_connection():
+        logger.warning(
+            "neo4j unreachable at startup; centrality will fall back to NetworkX "
+            "until it recovers -- see GET /health for live status"
+        )
     yield
     # Shutdown
     close_neo4j_driver()

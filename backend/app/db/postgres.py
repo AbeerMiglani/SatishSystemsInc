@@ -29,11 +29,6 @@ def get_db():
         db.close()
 
 
-def create_tables():
-    """Deprecated local helper. Production schema changes use Alembic."""
-    Base.metadata.create_all(bind=engine)
-
-
 def verify_postgres_connection() -> bool:
     """Perform an actual round trip rather than assuming the pool is healthy."""
     try:

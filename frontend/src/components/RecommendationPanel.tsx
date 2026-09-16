@@ -14,8 +14,8 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSimulationStore, StoredScenario } from "../stores/simulationStore";
 import { useUIStore } from "../stores/uiStore";
-import { useNetworkTopology } from "../api/hooks";
-import type { InfraNode, MitigationRecommendation, SimulationResult } from "../types";
+import { useNetworkTopology, pollSimulationUntilSettled } from "../api/hooks";
+import type { InfraNode, MitigationRecommendation, Modification, SimulationResult } from "../types";
 import { comparablePopulation } from "../types";
 import { failedNodeIdsForResult } from "../utils/derive";
 import ProvenanceTag from "./shared/ProvenanceTag";
@@ -48,7 +48,7 @@ function describeModifications(
   const nameOf = (id: string) =>
     nodeLookup.get(id)?.display_name || nodeLookup.get(id)?.name || id.slice(0, 8);
 
-  return (rec.scenario_payload?.modifications ?? []).map((mod: any) => {
+  return (rec.scenario_payload?.modifications ?? []).map((mod: Modification) => {
     if (mod.type === "upgrade_node") {
       const from = nodeLookup.get(mod.node_id)?.capacity;
       const to = mod.capacity ?? rec.proposed_capacity;
@@ -62,7 +62,9 @@ function describeModifications(
       const phrase = kind.endsWith("link") ? kind : `${kind} link`;
       return `New ${phrase}: ${nameOf(mod.source)} → ${nameOf(mod.target)}`;
     }
-    return `Modification: ${mod.type}`;
+    // Defensive fallback only: the wire payload is trusted JSON, not something
+    // the type system verifies, so an unrecognized `type` is still possible.
+    return `Modification: ${(mod as { type?: string }).type ?? "unknown"}`;
   });
 }
 
@@ -173,30 +175,20 @@ export default function RecommendationPanel() {
     if (!simRes.ok) throw new Error("Failed to start simulation");
     const simData = await simRes.json();
 
-    const simId = simData.id;
-    for (let attempt = 0; attempt < 30; attempt++) {
-      await new Promise((r) => setTimeout(r, 2000));
-      const pollRes = await fetch(`/api/simulations/${simId}`);
-      if (!pollRes.ok) throw new Error("Failed to poll simulation");
-      const pollData = (await pollRes.json()) as SimulationResult;
-      if (pollData.status === "completed" || pollData.status === "failed") {
-        if (pollData.status === "failed") throw new Error(pollData.error_message || "Re-simulation failed.");
-        addSimulation(
-          {
-            id: pollData.id,
-            network_id: pollData.network_id,
-            initial_failures: pollData.initial_failures,
-            total_failed: pollData.total_failed,
-            is_baseline: false,
-            scenario_id: scenario.id,
-            created_at: new Date().toISOString(),
-          },
-          false
-        );
-        return pollData;
-      }
-    }
-    throw new Error("Re-simulation timed out after 60 s.");
+    const pollData = await pollSimulationUntilSettled(simData.id);
+    addSimulation(
+      {
+        id: pollData.id,
+        network_id: pollData.network_id,
+        initial_failures: pollData.initial_failures,
+        total_failed: pollData.total_failed,
+        is_baseline: false,
+        scenario_id: scenario.id,
+        created_at: new Date().toISOString(),
+      },
+      false
+    );
+    return pollData;
   };
 
   const handleRunVerifiedRerun = async () => {
@@ -586,6 +578,18 @@ export default function RecommendationPanel() {
                           {a.raw_population_saved.toLocaleString()} pop
                         </span>
                       </div>
+                      {/* Some add_edge candidates carry no failures/population
+                          saved at all — they reconnect an asset that survived
+                          the baseline in isolation, so the only real effect is
+                          structural: a small global-efficiency gain. Without a
+                          label a "0 / 0" candidate reads as a broken
+                          recommendation rather than the honest "nothing
+                          concrete failed here" it actually is. */}
+                      {a.failures_prevented === 0 && a.raw_population_saved === 0 && !a.protects_critical_services && (
+                        <div>
+                          <ProvenanceTag kind="derived" label="Structural resilience only · no immediate failures" />
+                        </div>
+                      )}
                       <div style={{ display: "flex", justifyContent: "flex-end" }}>
                         <button
                           className="rp-btn rp-btn-secondary"

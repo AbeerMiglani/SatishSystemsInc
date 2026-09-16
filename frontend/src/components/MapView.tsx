@@ -115,9 +115,21 @@ export default function MapView({ nodes, edges }: MapViewProps) {
     failedNodeIdsRef.current = failedNodeIds;
   }, [failedNodeIds]);
 
-  // Pulsing animation for failed nodes
+  // Pulsing animation for failed nodes.
+  //
+  // Runs only while something is actually failed. It used to run unconditionally
+  // for the component's entire lifetime, ticking setState at 60fps regardless of
+  // whether any node was failed — and because pulseRadius is a dependency of
+  // updateLayers below, every one of those frames rebuilt the node lookup,
+  // re-filtered the full edge list, and reconstructed all three deck.gl layers,
+  // for as long as the map was open.
   const [pulseRadius, setPulseRadius] = useState(1);
+  const hasFailedNodes = failedNodeIds.size > 0;
   useEffect(() => {
+    if (!hasFailedNodes) {
+      setPulseRadius(1);
+      return;
+    }
     let frame: number;
     let start = performance.now();
     const animate = (now: number) => {
@@ -127,10 +139,13 @@ export default function MapView({ nodes, edges }: MapViewProps) {
     };
     frame = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(frame);
-  }, []);
+  }, [hasFailedNodes]);
 
-  // Build node lookup for edge rendering
-  const nodeById = useCallback(() => {
+  // Node lookup for edge rendering and the blast-radius layer. A real useMemo
+  // rather than a useCallback factory: the previous version handed back a new
+  // function that built a fresh Map on every single call, including the one
+  // inside updateLayers that ran every render.
+  const nodeById = useMemo(() => {
     const map = new Map<string, InfraNode>();
     for (const n of nodes) map.set(n.id, n);
     return map;
@@ -141,7 +156,7 @@ export default function MapView({ nodes, edges }: MapViewProps) {
   // Update deck.gl layers when state changes
   const updateLayers = useCallback(() => {
     if (!deckRef.current) return;
-    const lookup = nodeById();
+    const lookup = nodeById;
 
     const visibleNodes = showRoads ? nodes : nodes.filter((n) => n.node_type !== "road_junction");
 

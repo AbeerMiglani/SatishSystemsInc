@@ -164,7 +164,7 @@ export interface MitigationRecommendation {
     network_id: string;
     name: string;
     description: string;
-    modifications: any[];
+    modifications: Modification[];
     initial_failures: string[];
   };
 }

@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import type { CentralityScore, InfraEdge, InfraNode, MitigationRecommendation, SimulationResult } from "../types";
+import type { CentralityScore, InfraEdge, InfraNode, MitigationRecommendation, Modification, SimulationResult } from "../types";
 
 // ---------------------------------------------------------------------------
 // Networks
@@ -89,13 +89,44 @@ export function useSimulationResult(simId: string | null) {
   });
 }
 
+/**
+ * Backend hard cap on one simulation task — celery_app.py's task_time_limit
+ * (120s), past which Celery kills the worker outright. Polling has to outlast
+ * that: stopping any sooner risks reporting "timed out" on the frontend for a
+ * run that is still legitimately executing server-side and about to complete.
+ * 30s of margin on top covers queueing and network latency before the task
+ * even starts running.
+ */
+const SIMULATION_POLL_TIMEOUT_MS = 150_000;
+const SIMULATION_POLL_INTERVAL_MS = 2000;
+
+/**
+ * Polls a simulation until it settles, for callers that need the resolved
+ * result inline (e.g. running a recommendation's verified rerun) rather than
+ * through `useSimulationResult`'s query-cache subscription.
+ */
+export async function pollSimulationUntilSettled(simId: string): Promise<SimulationResult> {
+  const deadline = Date.now() + SIMULATION_POLL_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, SIMULATION_POLL_INTERVAL_MS));
+    const res = await fetch(`/api/simulations/${simId}`);
+    if (!res.ok) throw new Error("Failed to poll simulation");
+    const data = (await res.json()) as SimulationResult;
+    if (data.status === "completed" || data.status === "failed") {
+      if (data.status === "failed") throw new Error(data.error_message || "Re-simulation failed.");
+      return data;
+    }
+  }
+  throw new Error(`Re-simulation timed out after ${Math.round(SIMULATION_POLL_TIMEOUT_MS / 1000)}s.`);
+}
+
 // ---------------------------------------------------------------------------
 // Scenarios
 // ---------------------------------------------------------------------------
 
 export function useCreateScenario() {
   return useMutation({
-    mutationFn: async (params: { network_id: string; name: string; description?: string; modifications: any[]; initial_failures: string[] }) => {
+    mutationFn: async (params: { network_id: string; name: string; description?: string; modifications: Modification[]; initial_failures: string[] }) => {
       const res = await fetch("/api/scenarios", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
